@@ -1,4 +1,5 @@
 #include <stdarg.h>
+#include "lowlevelilinstruction.h"
 #include "il.h"
 
 using namespace BinaryNinja;
@@ -806,6 +807,29 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 					ILREG(operand1),
 					ReadILOperand(il, operand2, REGSZ(operand1)), IL_FLAGWRITE_ALL));
 		break;
+	case ARM64_CCMP:
+		{
+			LowLevelILLabel trueCode, falseCode, done;
+
+			il.AddInstruction(il.If(GetCondition(il, (Condition)REG(operand4)), trueCode, falseCode));
+
+			il.MarkLabel(trueCode);
+			il.AddInstruction(il.Sub(REGSZ(operand1),
+						ILREG(operand1),
+						ReadILOperand(il, operand2, REGSZ(operand1)), IL_FLAGWRITE_ALL));
+			il.AddInstruction(il.Goto(done));
+
+			il.MarkLabel(falseCode);
+			il.AddInstruction(il.SetFlag(IL_FLAG_N, il.Const(0, (IMM(operand3) >> 3) & 1)));
+			il.AddInstruction(il.SetFlag(IL_FLAG_Z, il.Const(0, (IMM(operand3) >> 2) & 1)));
+			il.AddInstruction(il.SetFlag(IL_FLAG_C, il.Const(0, (IMM(operand3) >> 1) & 1)));
+			il.AddInstruction(il.SetFlag(IL_FLAG_V, il.Const(0, (IMM(operand3) >> 0) & 1)));
+
+			il.AddInstruction(il.Goto(done));
+
+			il.MarkLabel(done);
+		}
+		break;
 	case ARM64_CSEL:
 		ConditionExecute(il, (Condition)REG(operand4),
 			il.SetRegister(REGSZ(operand1), REG(operand1), ILREG(operand2)),
@@ -862,6 +886,9 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 					il.Xor(REGSZ(operand1),
 						ILREG(operand2),
 						ReadILOperand(il, operand3, REGSZ(operand1)))));
+		break;
+	case ARM64_ISB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_ISB, {}));
 		break;
 	case ARM64_LDAR:
 	case ARM64_LDAXR:
@@ -964,9 +991,31 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.Add(REGSZ(operand1), ILREG(operand4), il.Mult(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
 		break;
+	case ARM64_MRS:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
+					ARM64_INTRIN_MRS,
+					{ILREG(operand2)}));
+		break;
 	case ARM64_MSUB:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.Sub(REGSZ(operand1), ILREG(operand4), il.Mult(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
+		break;
+	case ARM64_MSR:
+		switch (operand2.operandClass) {
+		case IMM32:
+			il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
+						ARM64_INTRIN_MSR,
+						{il.Const(4, IMM(operand2))}));
+			break;
+		case REG:
+			il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
+						ARM64_INTRIN_MSR,
+						{ILREG(operand2)}));
+			break;
+		default:
+			LogError("unknown MSR operand class: %x\n", operand2.operandClass);
+			break;
+		}
 		break;
 	case ARM64_NEG:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
@@ -1098,9 +1147,59 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					ExtractRegister(il, operand2, 0, 2, false, REGSZ(operand1))));
 		break;
+    case ARM64_WFE:
+        il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_WFE, {}));
+        break;
+    case ARM64_WFI:
+        il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_WFI, {}));
+        break;
 	case ARM64_BRK:
 		il.AddInstruction(il.Trap(IMM(operand1))); // FIXME Breakpoint may need a parameter (IMM(operand1)));
 		return false;
+	case ARM64_HINT:
+		switch (IMM(operand1)) {
+		case 0:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_NOP, {}));
+			break;
+		case 1:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_YIELD, {}));
+			break;
+		case 2:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_WFE, {}));
+			break;
+		case 3:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_WFI, {}));
+			break;
+		case 4:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_SEV, {}));
+			break;
+		case 5:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_SEVL, {}));
+			break;
+		case 6:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_DGH, {}));
+			break;
+		case 0x10:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_ESB, {}));
+			break;
+		case 0x11:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_PSB, {}));
+			break;
+		case 0x12:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_TSB, {}));
+			break;
+		case 0x14:
+			il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_CSDB, {}));
+			break;
+		default:
+			if ((IMM(operand1) & ~0b110) == 0b100000)
+				il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_BTI, {}));
+			else
+				LogWarn("unknown hint operand: %x\n", IMM(operand1));
+			break;
+		}
+
+		break;
 	case ARM64_HLT:
 		il.AddInstruction(il.Trap(IMM(operand1)));
 		return false;

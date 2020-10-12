@@ -818,6 +818,118 @@ public:
 	}
 
 
+	virtual string GetIntrinsicName(uint32_t intrinsic) override
+	{
+		switch (intrinsic)
+		{
+		case ARM64_INTRIN_ISB:
+			return "__isb";
+		case ARM64_INTRIN_WFE:
+			return "__wfe";
+		case ARM64_INTRIN_WFI:
+			return "__wfi";
+		case ARM64_INTRIN_MSR:
+			return "_WriteStatusReg";
+		case ARM64_INTRIN_MRS:
+			return "_ReadStatusReg";
+		case ARM64_INTRIN_HINT_NOP:
+			return "SystemHintOp_NOP";
+		case ARM64_INTRIN_HINT_YIELD:
+			return "SystemHintOp_YIELD";
+		case ARM64_INTRIN_HINT_WFE:
+			return "SystemHintOp_WFE";
+		case ARM64_INTRIN_HINT_WFI:
+			return "SystemHintOp_WFI";
+		case ARM64_INTRIN_HINT_SEV:
+			return "SystemHintOp_SEV";
+		case ARM64_INTRIN_HINT_SEVL:
+			return "SystemHintOp_SEVL";
+		case ARM64_INTRIN_HINT_DGH:
+			return "SystemHintOp_DGH";
+		case ARM64_INTRIN_HINT_ESB:
+			return "SystemHintOp_ESB";
+		case ARM64_INTRIN_HINT_PSB:
+			return "SystemHintOp_PSB";
+		case ARM64_INTRIN_HINT_TSB:
+			return "SystemHintOp_TSB";
+		case ARM64_INTRIN_HINT_CSDB:
+			return "SystemHintOp_CSDB";
+		case ARM64_INTRIN_HINT_BTI:
+			return "SystemHintOp_BTI";
+		default:
+			return "";
+		}
+	}
+
+
+	virtual vector<uint32_t> GetAllIntrinsics() override
+	{
+		return vector<uint32_t> {ARM64_INTRIN_ISB, ARM64_INTRIN_WFE, ARM64_INTRIN_WFI,
+			ARM64_INTRIN_MSR, ARM64_INTRIN_MRS, ARM64_INTRIN_HINT_NOP, ARM64_INTRIN_HINT_YIELD,
+			ARM64_INTRIN_HINT_WFE, ARM64_INTRIN_HINT_WFI, ARM64_INTRIN_HINT_SEV, ARM64_INTRIN_HINT_SEVL,
+			ARM64_INTRIN_HINT_DGH, ARM64_INTRIN_HINT_ESB, ARM64_INTRIN_HINT_PSB, ARM64_INTRIN_HINT_TSB,
+			ARM64_INTRIN_HINT_CSDB, ARM64_INTRIN_HINT_BTI};
+	}
+
+
+	virtual vector<NameAndType> GetIntrinsicInputs(uint32_t intrinsic) override
+	{
+		switch (intrinsic)
+		{
+		case ARM64_INTRIN_MSR:
+			return {NameAndType(Type::IntegerType(8, false))};
+		case ARM64_INTRIN_MRS:
+			return {NameAndType(Type::IntegerType(4, false))};
+		case ARM64_INTRIN_ISB:
+		case ARM64_INTRIN_WFE:
+		case ARM64_INTRIN_WFI:
+		case ARM64_INTRIN_HINT_NOP:
+		case ARM64_INTRIN_HINT_YIELD:
+		case ARM64_INTRIN_HINT_WFE:
+		case ARM64_INTRIN_HINT_WFI:
+		case ARM64_INTRIN_HINT_SEV:
+		case ARM64_INTRIN_HINT_SEVL:
+		case ARM64_INTRIN_HINT_DGH:
+		case ARM64_INTRIN_HINT_ESB:
+		case ARM64_INTRIN_HINT_PSB:
+		case ARM64_INTRIN_HINT_TSB:
+		case ARM64_INTRIN_HINT_CSDB:
+		case ARM64_INTRIN_HINT_BTI:
+		default:
+			return vector<NameAndType>();
+		}
+	}
+
+
+	virtual vector<Confidence<Ref<Type>>> GetIntrinsicOutputs(uint32_t intrinsic) override
+	{
+		switch (intrinsic)
+		{
+		case ARM64_INTRIN_MSR:
+			return {Type::IntegerType(4, false)};
+		case ARM64_INTRIN_MRS:
+			return {Type::IntegerType(8, false)};
+		case ARM64_INTRIN_ISB:
+		case ARM64_INTRIN_WFE:
+		case ARM64_INTRIN_WFI:
+		case ARM64_INTRIN_HINT_NOP:
+		case ARM64_INTRIN_HINT_YIELD:
+		case ARM64_INTRIN_HINT_WFE:
+		case ARM64_INTRIN_HINT_WFI:
+		case ARM64_INTRIN_HINT_SEV:
+		case ARM64_INTRIN_HINT_SEVL:
+		case ARM64_INTRIN_HINT_DGH:
+		case ARM64_INTRIN_HINT_ESB:
+		case ARM64_INTRIN_HINT_PSB:
+		case ARM64_INTRIN_HINT_TSB:
+		case ARM64_INTRIN_HINT_CSDB:
+		case ARM64_INTRIN_HINT_BTI:
+		default:
+			return vector<Confidence<Ref<Type>>>();
+		}
+	}
+
+
 	virtual bool IsNeverBranchPatchAvailable(const uint8_t* data, uint64_t addr, size_t len) override
 	{
 		Instruction instr;
@@ -1058,7 +1170,7 @@ public:
 
 	virtual vector<uint32_t> GetAllRegisters() override
 	{
-		return vector<uint32_t>{
+		vector<uint32_t> r = {
 			REG_W0,  REG_W1,  REG_W2,  REG_W3,  REG_W4,  REG_W5,  REG_W6,  REG_W7,
 			REG_W8,  REG_W9,  REG_W10, REG_W11, REG_W12, REG_W13, REG_W14, REG_W15,
 			REG_W16, REG_W17, REG_W18, REG_W19, REG_W20, REG_W21, REG_W22, REG_W23,
@@ -1092,6 +1204,13 @@ public:
 			REG_Q16, REG_Q17, REG_Q18, REG_Q19, REG_Q20, REG_Q21, REG_Q22, REG_Q23,
 			REG_Q24, REG_Q25, REG_Q26, REG_Q27, REG_Q28, REG_Q29, REG_Q30, REG_Q31
 		};
+
+		// this could also be inlined, but the odds of more status registers being added
+		// seems high, and updatingthem multiple places would be a pain
+		for (uint32_t ii = SYSREG_NONE + 1; ii < SYSREG_END; ++ii)
+			r.push_back(ii);
+
+		return r;
 	}
 
 
@@ -1382,6 +1501,10 @@ public:
 			case REG_Q31:
 				return RegisterInfo(reg, 0, 16);
 		}
+
+		if (reg > SYSREG_NONE && reg < SYSREG_END)
+			return RegisterInfo(reg, 0, 4);
+
 		return RegisterInfo(0, 0, 0);
 	}
 
@@ -1393,6 +1516,16 @@ public:
 	virtual uint32_t GetLinkRegister() override
 	{
 		return REG_X30;
+	}
+
+	virtual vector<uint32_t> GetSystemRegisters() override {
+		vector<uint32_t> system_regs = {};
+
+		for (uint32_t ii = SYSREG_NONE + 1; ii < SYSREG_END; ++ii) {
+			system_regs.push_back(ii);
+		}
+
+		return system_regs;
 	}
 };
 
