@@ -875,6 +875,12 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 			il.SetRegister(REGSZ(operand1), REG(operand1), il.Neg(REGSZ(operand1), ILREG(operand2))),
 			il.SetRegister(REGSZ(operand1), REG(operand1), ILREG(operand2)));
 		break;
+	case ARM64_DMB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_DMB, {}));
+		break;
+	case ARM64_DSB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_DSB, {}));
+		break;
 	case ARM64_EON:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.Xor(REGSZ(operand1),
@@ -1060,6 +1066,9 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.DivSigned(REGSZ(operand2), ILREG(operand2), ILREG(operand3))));
 		break;
+	case ARM64_SEV:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_SEV, {}));
+		break;
 	case ARM64_STP:
 		if (instr.operands[0].reg[0] >= REG_B0 && instr.operands[0].reg[0] <= REG_Q31)
 			il.AddInstruction(il.Unimplemented());
@@ -1094,10 +1103,8 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 					instr.operation == ARM64_SUBS ? IL_FLAGWRITE_ALL : 0)));
 		break;
 	case ARM64_SVC:
-		if (instr.operands[0].immediate == 0)
-			il.AddInstruction(il.SystemCall());
-		else
-			il.AddInstruction(il.Unimplemented());
+		il.AddInstruction(il.SetRegister(2, FAKEREG_SYSCALL_IMM, il.Const(2, IMM(operand1))));
+		il.AddInstruction(il.SystemCall());
 		break;
 	case ARM64_SXTB:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
@@ -1195,7 +1202,7 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 			if ((IMM(operand1) & ~0b110) == 0b100000)
 				il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_BTI, {}));
 			else
-				LogWarn("unknown hint operand: %x\n", IMM(operand1));
+				LogWarn("unknown hint operand: %llx\n", IMM(operand1));
 			break;
 		}
 

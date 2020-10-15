@@ -30,6 +30,16 @@ enum Arm64Intrinsic : uint32_t
 	ARM64_INTRIN_HINT_TSB,
 	ARM64_INTRIN_HINT_CSDB,
 	ARM64_INTRIN_HINT_BTI,
+	ARM64_INTRIN_SEV,
+	ARM64_INTRIN_DMB,
+	ARM64_INTRIN_DSB,
+};
+
+enum Arm64FakeRegister: uint32_t
+{
+	FAKEREG_NONE = arm64::SYSREG_END + 1,
+	FAKEREG_SYSCALL_IMM,
+	FAKEREG_END,
 };
 
 bool GetLowLevelILForInstruction(
