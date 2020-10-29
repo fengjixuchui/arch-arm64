@@ -697,7 +697,7 @@ public:
 	{
 	}
 
-	bool CanAssemble()
+	bool CanAssemble() override
 	{
 		return true;
 	}
@@ -837,23 +837,39 @@ public:
 			return "_WriteStatusReg";
 		case ARM64_INTRIN_MRS:
 			return "_ReadStatusReg";
-		case ARM64_INTRIN_HINT_NOP:
-			return "SystemHintOp_NOP";
-		case ARM64_INTRIN_HINT_YIELD:
-			return "SystemHintOp_YIELD";
-		case ARM64_INTRIN_HINT_WFE:
-			return "SystemHintOp_WFE";
-		case ARM64_INTRIN_HINT_WFI:
-			return "SystemHintOp_WFI";
-		case ARM64_INTRIN_HINT_SEV:
-			return "SystemHintOp_SEV";
-		case ARM64_INTRIN_HINT_SEVL:
-			return "SystemHintOp_SEVL";
 		case ARM64_INTRIN_HINT_DGH:
 			return "SystemHintOp_DGH";
-		case ARM64_INTRIN_HINT_ESB:
+		case ARM64_INTRIN_ESB:
 			return "SystemHintOp_ESB";
-		case ARM64_INTRIN_HINT_PSB:
+		case ARM64_INTRIN_PACDA:
+			return "__pacda";
+		case ARM64_INTRIN_PACDB:
+			return "__pacdb";
+		case ARM64_INTRIN_PACDZA:
+			return "__pacdza";
+		case ARM64_INTRIN_PACDZB:
+			return "__pacdzb";
+		case ARM64_INTRIN_PACIA:
+			return "__pacia";
+		case ARM64_INTRIN_PACIA1716:
+			return "__pacia1716";
+		case ARM64_INTRIN_PACIASP:
+			return "__paciasp";
+		case ARM64_INTRIN_PACIAZ:
+			return "__paciaz";
+		case ARM64_INTRIN_PACIZA:
+			return "__paciza";
+		case ARM64_INTRIN_PACIB:
+			return "__pacib";
+		case ARM64_INTRIN_PACIB1716:
+			return "__pacib1716";
+		case ARM64_INTRIN_PACIBSP:
+			return "__pacibsp";
+		case ARM64_INTRIN_PACIBZ:
+			return "__pacibz";
+		case ARM64_INTRIN_PACIZB:
+			return "__pacizb";
+		case ARM64_INTRIN_PSBCSYNC:
 			return "SystemHintOp_PSB";
 		case ARM64_INTRIN_HINT_TSB:
 			return "SystemHintOp_TSB";
@@ -863,10 +879,16 @@ public:
 			return "SystemHintOp_BTI";
 		case ARM64_INTRIN_SEV:
 			return "__sev";
+		case ARM64_INTRIN_SEVL:
+			return "__sevl";
 		case ARM64_INTRIN_DMB:
 			return "__dmb";
 		case ARM64_INTRIN_DSB:
 			return "__dsb";
+		case ARM64_INTRIN_YIELD:
+			return "__yield";
+		case ARM64_INTRIN_PRFM:
+			return "__prefetch";
 		default:
 			return "";
 		}
@@ -875,11 +897,17 @@ public:
 
 	virtual vector<uint32_t> GetAllIntrinsics() override
 	{
-		return vector<uint32_t> {ARM64_INTRIN_ISB, ARM64_INTRIN_WFE, ARM64_INTRIN_WFI,
-			ARM64_INTRIN_MSR, ARM64_INTRIN_MRS, ARM64_INTRIN_HINT_NOP, ARM64_INTRIN_HINT_YIELD,
-			ARM64_INTRIN_HINT_WFE, ARM64_INTRIN_HINT_WFI, ARM64_INTRIN_HINT_SEV, ARM64_INTRIN_HINT_SEVL,
-			ARM64_INTRIN_HINT_DGH, ARM64_INTRIN_HINT_ESB, ARM64_INTRIN_HINT_PSB, ARM64_INTRIN_HINT_TSB,
-			ARM64_INTRIN_HINT_CSDB, ARM64_INTRIN_HINT_BTI, ARM64_INTRIN_SEV, ARM64_INTRIN_DMB, ARM64_INTRIN_DSB};
+		return vector<uint32_t> {
+			ARM64_INTRIN_DMB, ARM64_INTRIN_DSB, ARM64_INTRIN_ESB, ARM64_INTRIN_HINT_BTI, ARM64_INTRIN_HINT_CSDB,
+			ARM64_INTRIN_HINT_DGH, ARM64_INTRIN_HINT_TSB, ARM64_INTRIN_ISB, ARM64_INTRIN_MRS, ARM64_INTRIN_MSR,
+			ARM64_INTRIN_PACDA, ARM64_INTRIN_PACDB, ARM64_INTRIN_PACDZA, ARM64_INTRIN_PACDZB,
+			ARM64_INTRIN_PACIA, ARM64_INTRIN_PACIA1716, ARM64_INTRIN_PACIASP,
+			ARM64_INTRIN_PACIAZ, ARM64_INTRIN_PACIZA,
+			ARM64_INTRIN_PACIB, ARM64_INTRIN_PACIB1716, ARM64_INTRIN_PACIBSP,
+			ARM64_INTRIN_PACIBZ, ARM64_INTRIN_PACIZB,
+			ARM64_INTRIN_PRFM, ARM64_INTRIN_PSBCSYNC, ARM64_INTRIN_SEV, ARM64_INTRIN_SEVL, ARM64_INTRIN_WFE,
+			ARM64_INTRIN_WFI, ARM64_INTRIN_YIELD
+		};
 	}
 
 
@@ -891,24 +919,37 @@ public:
 			return {NameAndType(Type::IntegerType(8, false))};
 		case ARM64_INTRIN_MRS:
 			return {NameAndType(Type::IntegerType(4, false))};
-		case ARM64_INTRIN_ISB:
-		case ARM64_INTRIN_WFE:
-		case ARM64_INTRIN_WFI:
-		case ARM64_INTRIN_HINT_NOP:
-		case ARM64_INTRIN_HINT_YIELD:
-		case ARM64_INTRIN_HINT_WFE:
-		case ARM64_INTRIN_HINT_WFI:
-		case ARM64_INTRIN_HINT_SEV:
-		case ARM64_INTRIN_HINT_SEVL:
-		case ARM64_INTRIN_HINT_DGH:
-		case ARM64_INTRIN_HINT_ESB:
-		case ARM64_INTRIN_HINT_PSB:
-		case ARM64_INTRIN_HINT_TSB:
-		case ARM64_INTRIN_HINT_CSDB:
-		case ARM64_INTRIN_HINT_BTI:
-		case ARM64_INTRIN_SEV:
+		case ARM64_INTRIN_PACDA: // reads <Xn>
+		case ARM64_INTRIN_PACDB: // reads <Xn>
+		case ARM64_INTRIN_PACIA: // reads <Xn>
+		case ARM64_INTRIN_PACIB: // reads <Xn>
+		case ARM64_INTRIN_PACIA1716: // reads x16
+		case ARM64_INTRIN_PACIB1716: // reads x16
+		case ARM64_INTRIN_PRFM:
+			return {NameAndType(Type::IntegerType(8, false))};
+		case ARM64_INTRIN_PACIASP: // reads x30, sp
+		case ARM64_INTRIN_PACIBSP: // reads x30, sp
+			return {NameAndType(Type::IntegerType(8, false)), NameAndType(Type::IntegerType(8, false))};
 		case ARM64_INTRIN_DMB:
 		case ARM64_INTRIN_DSB:
+		case ARM64_INTRIN_ESB:
+		case ARM64_INTRIN_HINT_BTI:
+		case ARM64_INTRIN_HINT_CSDB:
+		case ARM64_INTRIN_HINT_DGH:
+		case ARM64_INTRIN_HINT_TSB:
+		case ARM64_INTRIN_ISB:
+		case ARM64_INTRIN_PACDZA: // modifier is 0
+		case ARM64_INTRIN_PACDZB: // modifier is 0
+		case ARM64_INTRIN_PACIAZ: // modifier is 0
+		case ARM64_INTRIN_PACIBZ: // modifier is 0
+		case ARM64_INTRIN_PACIZA: // modifier is 0
+		case ARM64_INTRIN_PACIZB: // modifier is 0
+		case ARM64_INTRIN_PSBCSYNC:
+		case ARM64_INTRIN_SEV:
+		case ARM64_INTRIN_SEVL:
+		case ARM64_INTRIN_WFE:
+		case ARM64_INTRIN_WFI:
+		case ARM64_INTRIN_YIELD:
 		default:
 			return vector<NameAndType>();
 		}
@@ -922,25 +963,36 @@ public:
 		case ARM64_INTRIN_MSR:
 			return {Type::IntegerType(4, false)};
 		case ARM64_INTRIN_MRS:
+		case ARM64_INTRIN_PACDA: // writes <Xd>
+		case ARM64_INTRIN_PACDB: // writes <Xd>
+		case ARM64_INTRIN_PACDZA: // writes <Xd>
+		case ARM64_INTRIN_PACDZB: // writes <Xd>
+		case ARM64_INTRIN_PACIA1716: // writes x17
+		case ARM64_INTRIN_PACIA: // writes <Xd>
+		case ARM64_INTRIN_PACIASP: // writes x30
+		case ARM64_INTRIN_PACIAZ: // writes x30
+		case ARM64_INTRIN_PACIB1716: // writes x17
+		case ARM64_INTRIN_PACIB: // writes <Xd>
+		case ARM64_INTRIN_PACIBSP: // writes x30
+		case ARM64_INTRIN_PACIBZ: // writes x30
+		case ARM64_INTRIN_PACIZA: // writes <Xd>
+		case ARM64_INTRIN_PACIZB: // writes <Xd>
 			return {Type::IntegerType(8, false)};
 		case ARM64_INTRIN_ISB:
 		case ARM64_INTRIN_WFE:
 		case ARM64_INTRIN_WFI:
-		case ARM64_INTRIN_HINT_NOP:
-		case ARM64_INTRIN_HINT_YIELD:
-		case ARM64_INTRIN_HINT_WFE:
-		case ARM64_INTRIN_HINT_WFI:
-		case ARM64_INTRIN_HINT_SEV:
-		case ARM64_INTRIN_HINT_SEVL:
 		case ARM64_INTRIN_HINT_DGH:
-		case ARM64_INTRIN_HINT_ESB:
-		case ARM64_INTRIN_HINT_PSB:
+		case ARM64_INTRIN_ESB:
+		case ARM64_INTRIN_PSBCSYNC:
 		case ARM64_INTRIN_HINT_TSB:
 		case ARM64_INTRIN_HINT_CSDB:
 		case ARM64_INTRIN_HINT_BTI:
 		case ARM64_INTRIN_SEV:
+		case ARM64_INTRIN_SEVL:
 		case ARM64_INTRIN_DMB:
 		case ARM64_INTRIN_DSB:
+		case ARM64_INTRIN_YIELD:
+		case ARM64_INTRIN_PRFM:
 		default:
 			return vector<Confidence<Ref<Type>>>();
 		}
@@ -1230,7 +1282,7 @@ public:
 		};
 
 		// this could also be inlined, but the odds of more status registers being added
-		// seems high, and updatingthem multiple places would be a pain
+		// seems high, and updating them multiple places would be a pain
 		for (uint32_t ii = SYSREG_NONE + 1; ii < SYSREG_END; ++ii)
 			r.push_back(ii);
 
@@ -1926,6 +1978,38 @@ public:
 	}
 };
 
+class MacosArm64SystemCallConvention: public CallingConvention
+{
+public:
+	MacosArm64SystemCallConvention(Architecture* arch): CallingConvention(arch, "macos-syscall")
+	{
+	}
+
+
+	virtual vector<uint32_t> GetIntegerArgumentRegisters() override
+	{
+		return vector<uint32_t>{ REG_X16, REG_X0, REG_X1, REG_X2, REG_X3, REG_X4, REG_X5 };
+	}
+
+
+	virtual vector<uint32_t> GetCallerSavedRegisters() override
+	{
+		return vector<uint32_t>{ REG_X0 };
+	}
+
+
+	virtual vector<uint32_t> GetCalleeSavedRegisters() override
+	{
+		return vector<uint32_t>{ REG_X19, REG_X20, REG_X21, REG_X22, REG_X23, REG_X24, REG_X25,
+			REG_X26, REG_X27, REG_X28, REG_X29 };
+	}
+
+
+	virtual uint32_t GetIntegerReturnValueRegister() override
+	{
+		return REG_X0;
+	}
+};
 
 class Arm64MachoRelocationHandler: public RelocationHandler
 {

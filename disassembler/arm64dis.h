@@ -104,6 +104,22 @@ namespace arm64
 		ARM64_BSL,
 		ARM64_B_VC,
 		ARM64_B_VS,
+		ARM64_CAS, //Added for ARMv8.1-LSE
+		ARM64_CASA, //Added for ARMv8.1-LSE
+		ARM64_CASAB, //Added for ARMv8.1-LSE
+		ARM64_CASAH, //Added for ARMv8.1-LSE
+		ARM64_CASAL, //Added for ARMv8.1-LSE
+		ARM64_CASALB, //Added for ARMv8.1-LSE
+		ARM64_CASALH, //Added for ARMv8.1-LSE
+		ARM64_CASB, //Added for ARMv8.1-LSE
+		ARM64_CASH, //Added for ARMv8.1-LSE
+		ARM64_CASL, //Added for ARMv8.1-LSE
+		ARM64_CASLB, //Added for ARMv8.1-LSE
+		ARM64_CASLH, //Added for ARMv8.1-LSE
+		ARM64_CASP, //Added for ARMv8.1-LSE
+		ARM64_CASPA, //Added for ARMv8.1-LSE
+		ARM64_CASPAL, //Added for ARMv8.1-LSE
+		ARM64_CASPL, //Added for ARMv8.1-LSE
 		ARM64_CBNZ,
 		ARM64_CBZ,
 		ARM64_CCMN,
@@ -310,6 +326,7 @@ namespace arm64
 		ARM64_PACDB, //Added for 8.3
 		ARM64_PACDZA, //Added for 8.3
 		ARM64_PACDZB, //Added for 8.3
+		ARM64_PACGA, //Added for 8.3
 		ARM64_PACIA, //Added for 8.3
 		ARM64_PACIA1716, //Added for 8.3
 		ARM64_PACIASP, //Added for 8.3

@@ -89,6 +89,22 @@ static const char* OperationString[] = {
 	"bsl",
 	"b.vc",
 	"b.vs",
+	"cas", //Added for ARMv8.1-LSE
+	"casa", //Added for ARMv8.1-LSE
+	"casab", //Added for ARMv8.1-LSE
+	"casah", //Added for ARMv8.1-LSE
+	"casal", //Added for ARMv8.1-LSE
+	"casalb", //Added for ARMv8.1-LSE
+	"casalh", //Added for ARMv8.1-LSE
+	"casb", //Added for ARMv8.1-LSE
+	"cash", //Added for ARMv8.1-LSE
+	"casl", //Added for ARMv8.1-LSE
+	"caslb", //Added for ARMv8.1-LSE
+	"caslh", //Added for ARMv8.1-LSE
+	"casp", //Added for ARMv8.1-LSE
+	"caspa", //Added for ARMv8.1-LSE
+	"caspal", //Added for ARMv8.1-LSE
+	"caspl", //Added for ARMv8.1-LSE
 	"cbnz",
 	"cbz",
 	"ccmn",
@@ -295,6 +311,7 @@ static const char* OperationString[] = {
 	"pacdb", //Added for 8.3
 	"pacdza", //Added for 8.3
 	"pacdzb", //Added for 8.3
+	"pacga", //Added for 8.3
 	"pacia", //Added for 8.3
 	"pacia1716", //Added for 8.3
 	"paciasp", //Added for 8.3
@@ -2653,6 +2670,7 @@ uint32_t aarch64_decompose_data_processing_2(uint32_t instructionValue, Instruct
 	 * CRC32CH <Wd>, <Wn>, <Wm>
 	 * CRC32CW <Wd>, <Wn>, <Wm>
 	 * CRC32CX <Wd>, <Wn>, <Xm>
+	 * PACGA <Xd>, <Xn>, <Xm|SP>
 	 * SUBP <Xd>, <Xn|SP>, <Xm|SP>
 	 * SUBPS <Xd>, <Xn|SP>, <Xm|SP>
 	 */
@@ -2670,7 +2688,7 @@ uint32_t aarch64_decompose_data_processing_2(uint32_t instructionValue, Instruct
 			ARM64_SUBP,      ARM64_UNDEFINED, ARM64_UDIV,      ARM64_SDIV,
 			ARM64_IRG,       ARM64_GMI,       ARM64_UNDEFINED, ARM64_UNDEFINED,
 			ARM64_LSL,       ARM64_LSR,       ARM64_ASR,       ARM64_ROR,
-			ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_UNDEFINED,
+			ARM64_PACGA,     ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_UNDEFINED,
 			ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_CRC32X,
 			ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_CRC32CX,
 			ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_UNDEFINED, ARM64_UNDEFINED,
@@ -3483,38 +3501,38 @@ uint32_t aarch64_decompose_load_store_exclusive(uint32_t instructionValue, Instr
  	*/
 	LDST_EXCLUSIVE decode = *(LDST_EXCLUSIVE*)&instructionValue;
 	uint32_t opcode = decode.o2 << 2 | decode.o1 << 1 | decode.o0;
-	static const Operation operation[4][2][8] = {
+	static const Operation operation[4][2][8] = { /* [size][L][opcode] */
 		{
 			{
-				ARM64_STXRB, ARM64_STLXRB, ARM64_UNDEFINED, ARM64_UNDEFINED,
-				ARM64_UNDEFINED, ARM64_STLRB, ARM64_UNDEFINED, ARM64_UNDEFINED
+				ARM64_STXRB, ARM64_STLXRB, ARM64_CASP, ARM64_CASPL,
+				ARM64_UNDEFINED, ARM64_STLRB, ARM64_CASB, ARM64_CASLB
 			},{
-				ARM64_LDXRB, ARM64_LDAXRB, ARM64_UNDEFINED, ARM64_UNDEFINED,
-				ARM64_UNDEFINED, ARM64_LDARB, ARM64_UNDEFINED, ARM64_UNDEFINED
+				ARM64_LDXRB, ARM64_LDAXRB, ARM64_CASPA, ARM64_CASPAL,
+				ARM64_UNDEFINED, ARM64_LDARB, ARM64_CASAB, ARM64_CASALB,
 			}
 		},{
 			{
-				ARM64_STXRH, ARM64_STLXRH, ARM64_UNDEFINED, ARM64_UNDEFINED,
-				ARM64_UNDEFINED, ARM64_STLRH, ARM64_UNDEFINED, ARM64_UNDEFINED
+				ARM64_STXRH, ARM64_STLXRH, ARM64_CASP, ARM64_CASPL,
+				ARM64_UNDEFINED, ARM64_STLRH, ARM64_CASH, ARM64_CASLH
 			},{
-				ARM64_LDXRH, ARM64_LDAXRH, ARM64_UNDEFINED, ARM64_UNDEFINED,
-				ARM64_UNDEFINED, ARM64_LDARH, ARM64_UNDEFINED, ARM64_UNDEFINED
-			}
-		},{
-			{
-				ARM64_STXR, ARM64_STLXR, ARM64_STXP, ARM64_STLXP,
-				ARM64_UNDEFINED, ARM64_STLR, ARM64_UNDEFINED, ARM64_UNDEFINED
-			},{
-				ARM64_LDXR, ARM64_LDAXR, ARM64_LDXP, ARM64_LDAXP,
-				ARM64_UNDEFINED, ARM64_LDAR, ARM64_UNDEFINED, ARM64_UNDEFINED
+				ARM64_LDXRH, ARM64_LDAXRH, ARM64_CASPA, ARM64_CASPAL,
+				ARM64_UNDEFINED, ARM64_LDARH, ARM64_CASAH, ARM64_CASALH
 			}
 		},{
 			{
 				ARM64_STXR, ARM64_STLXR, ARM64_STXP, ARM64_STLXP,
-				ARM64_UNDEFINED, ARM64_STLR, ARM64_UNDEFINED, ARM64_UNDEFINED
+				ARM64_UNDEFINED, ARM64_STLR, ARM64_CAS, ARM64_CASL
 			},{
 				ARM64_LDXR, ARM64_LDAXR, ARM64_LDXP, ARM64_LDAXP,
-				ARM64_UNDEFINED, ARM64_LDAR, ARM64_UNDEFINED, ARM64_UNDEFINED
+				ARM64_UNDEFINED, ARM64_LDAR, ARM64_CASA, ARM64_CASAL
+			}
+		},{
+			{
+				ARM64_STXR, ARM64_STLXR, ARM64_STXP, ARM64_STLXP,
+				ARM64_UNDEFINED, ARM64_STLR, ARM64_CAS, ARM64_CASL
+			},{
+				ARM64_LDXR, ARM64_LDAXR, ARM64_LDXP, ARM64_LDAXP,
+				ARM64_UNDEFINED, ARM64_LDAR, ARM64_CASA, ARM64_CASAL
 			}
 		}
 	};
@@ -3522,6 +3540,28 @@ uint32_t aarch64_decompose_load_store_exclusive(uint32_t instructionValue, Instr
 	static const uint32_t regBase[] = {REG_W_BASE, REG_X_BASE};
 	instruction->operation = operation[decode.size][decode.L][opcode];
 	uint32_t i = 0;
+	if (instruction->operation >= ARM64_CAS && instruction->operation <= ARM64_CASPL)
+	{
+		int base_idx = decode.size==3 || (decode.size==1 && (opcode==2 || opcode==3));
+
+		instruction->operands[i].operandClass = REG;
+		instruction->operands[i++].reg[0]= REG(REGSET_ZR, regBase[base_idx], decode.Rs);
+		if( opcode==2 || opcode==3 )
+		{
+			instruction->operands[i].operandClass = REG;
+			instruction->operands[i++].reg[0]= REG(REGSET_ZR, regBase[base_idx], (decode.Rs+1)%32);
+		}
+		instruction->operands[i].operandClass = REG;
+		instruction->operands[i++].reg[0]= REG(REGSET_ZR, regBase[base_idx], decode.Rt);
+		if( opcode==2 || opcode==3 )
+		{
+			instruction->operands[i].operandClass = REG;
+			instruction->operands[i++].reg[0]= REG(REGSET_ZR, regBase[base_idx], (decode.Rt+1)%32);
+		}
+		instruction->operands[i].operandClass = MEM_REG;
+		instruction->operands[i].reg[0]= REG(REGSET_SP, REG_X_BASE, decode.Rn);
+	}
+	else
 	if (decode.size < 2)
 	{
 		instruction->operands[i].operandClass = REG;
