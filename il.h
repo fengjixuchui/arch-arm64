@@ -1,6 +1,8 @@
 #pragma once
 
 #include "binaryninjaapi.h"
+#include "disassembler/operations.h"
+#include "disassembler/encodings.h"
 #include "disassembler/arm64dis.h"
 
 #define IL_FLAG_N 0
@@ -13,6 +15,17 @@
 
 enum Arm64Intrinsic : uint32_t
 {
+	ARM64_INTRIN_AUTDA,
+	ARM64_INTRIN_AUTDB,
+	ARM64_INTRIN_AUTIA,
+	ARM64_INTRIN_AUTIB,
+	ARM64_INTRIN_AUTIB1716,
+	ARM64_INTRIN_AUTIBSP,
+	ARM64_INTRIN_AUTIBZ,
+	ARM64_INTRIN_AUTDZA,
+	ARM64_INTRIN_AUTDZB,
+	ARM64_INTRIN_AUTIZA,
+	ARM64_INTRIN_AUTIZB,
 	ARM64_INTRIN_DMB,
 	ARM64_INTRIN_DSB,
 	ARM64_INTRIN_ESB,
@@ -27,6 +40,7 @@ enum Arm64Intrinsic : uint32_t
 	ARM64_INTRIN_PACDB,
 	ARM64_INTRIN_PACDZA,
 	ARM64_INTRIN_PACDZB,
+	ARM64_INTRIN_PACGA,
 	ARM64_INTRIN_PACIA,
 	ARM64_INTRIN_PACIA1716,
 	ARM64_INTRIN_PACIASP,
@@ -43,20 +57,21 @@ enum Arm64Intrinsic : uint32_t
 	ARM64_INTRIN_SEVL,
 	ARM64_INTRIN_WFE,
 	ARM64_INTRIN_WFI,
+	ARM64_INTRIN_XPACD,
+	ARM64_INTRIN_XPACI,
+	ARM64_INTRIN_XPACLRI,
 	ARM64_INTRIN_YIELD,
 	ARM64_INTRIN_INVALID=0xFFFFFFFF,
 };
 
 enum Arm64FakeRegister: uint32_t
 {
-	FAKEREG_NONE = arm64::SYSREG_END + 1,
-	FAKEREG_SYSCALL_IMM,
-	FAKEREG_END,
+	FAKEREG_SYSCALL_IMM = SYSREG_END+1
 };
 
 bool GetLowLevelILForInstruction(
 		BinaryNinja::Architecture* arch,
 		uint64_t addr,
 		BinaryNinja::LowLevelILFunction& il,
-		arm64::Instruction& instr,
+		Instruction& instr,
 		size_t addrSize);

@@ -15,13 +15,26 @@ endif()
 file(GLOB SOURCES
 	*.cpp
 	*.h
-	disassembler/*.c
+	disassembler/arm64dis.c
+	disassembler/sysregs.c
+	disassembler/encodings.c
+	disassembler/operations.c
+	disassembler/pcode.c
+	disassembler/decode0.c
+	disassembler/decode1.c
+	disassembler/decode2.c
+	disassembler/decode_fields32.c
+	disassembler/decode_scratchpad.c
 	disassembler/*.h)
 
 if(DEMO)
 	add_library(arch_arm64 STATIC ${SOURCES})
 else()
 	add_library(arch_arm64 SHARED ${SOURCES})
+endif()
+
+if(NOT WIN32)
+	set_source_files_properties(disassembler/arm64dis.c PROPERTIES COMPILE_FLAGS -fno-strict-aliasing)
 endif()
 
 target_include_directories(arch_arm64

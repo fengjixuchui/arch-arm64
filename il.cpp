@@ -1,13 +1,15 @@
 #include <stdarg.h>
+#include <inttypes.h>
 #include "lowlevelilinstruction.h"
+
+#include "sysregs.h"
 #include "il.h"
 
 using namespace BinaryNinja;
-using namespace arm64;
 
 #define IMM(X) X.immediate
-#define REG(X) X.reg[0]
-#define REGSZ(X) get_register_size((Register)REG(X))
+#define REG(X) (X).reg[0]
+#define REGSZ(X) get_register_size(REG(X))
 #define ILREG(X) ExtractRegister(il, X, 0, REGSZ(X), false, REGSZ(X))
 #define ILCONST(X) il.Const(REGSZ(X), IMM(X))
 #define SETREG(R,V) il.AddInstruction(il.SetRegister(REGSZ(R), REG(R), V))
@@ -15,6 +17,7 @@ using namespace arm64;
 #define ADDREGREG(R1,R2) il.Add(REGSZ(R1), ILREG(R1), ILREG(R2))
 #define LOADVAL(R1, O) il.Load(REGSZ(R1), O)
 #define LOADREG(R1) il.Load(REGSZ(R1), ILREG(R1))
+#define ONES(N) (-1ULL >> (64-N))
 
 static ExprId GetCondition(LowLevelILFunction& il, Condition cond)
 {
@@ -74,11 +77,11 @@ static ExprId GetILOperandMemoryAddress(LowLevelILFunction& il, InstructionOpera
 		addr = il.Add(addrSize, il.Register(addrSize, operand.reg[0]), il.Const(addrSize, operand.immediate));
 		break;
 	case MEM_EXTENDED:
-		if	(operand.shiftType == SHIFT_NONE)
+		if	(operand.shiftType == ShiftType_NONE)
 			addr = il.Add(addrSize, il.Register(addrSize, operand.reg[0]), il.Const(addrSize, operand.immediate));
-		else if (operand.shiftType == SHIFT_LSL)
+		else if (operand.shiftType == ShiftType_LSL)
 			addr = il.Add(addrSize, il.Register(addrSize, operand.reg[0]),
-					il.ShiftLeft(addrSize, il.Const(addrSize, operand.immediate), il.Const(addrSize, operand.shiftValue)));
+					il.ShiftLeft(addrSize, il.Const(addrSize, operand.immediate), il.Const(0, operand.shiftValue)));
 		break;
 	default:
 		il.AddInstruction(il.Unimplemented());
@@ -90,7 +93,7 @@ static ExprId GetILOperandMemoryAddress(LowLevelILFunction& il, InstructionOpera
 
 static ExprId ExtractRegister(LowLevelILFunction& il, InstructionOperand& operand, size_t regNum, size_t extractSize, bool signExtend, size_t resultSize)
 {
-	size_t opsz = get_register_size((Register)operand.reg[regNum]);
+	size_t opsz = get_register_size(operand.reg[regNum]);
 
 	switch (operand.reg[regNum]) {
 		case REG_WZR:
@@ -121,42 +124,62 @@ static ExprId GetShiftedRegister(LowLevelILFunction& il, InstructionOperand& ope
 {
 	ExprId res;
 
+	// peel off the variants that return early
 	switch (operand.shiftType)
 	{
-		case SHIFT_NONE:
-		case SHIFT_LSR:
+		case ShiftType_NONE:
 			res = ExtractRegister(il, operand, regNum, REGSZ(operand), false, resultSize);
-
-			if (operand.shiftType == SHIFT_LSR && operand.shiftValue)
+			return res;
+		case ShiftType_ASR:
+			res = ExtractRegister(il, operand, regNum, REGSZ(operand), false, resultSize);
+			if (operand.shiftValue)
+				res = il.ArithShiftRight(resultSize, res,
+						il.Const(0, operand.shiftValue));
+			return res;
+		case ShiftType_LSR:
+			res = ExtractRegister(il, operand, regNum, REGSZ(operand), false, resultSize);
+			if (operand.shiftValue)
 				res = il.LogicalShiftRight(resultSize, res,
 						il.Const(1, operand.shiftValue));
-
 			return res;
-		case SHIFT_LSL:
+		case ShiftType_ROR:
+			res = ExtractRegister(il, operand, regNum, REGSZ(operand), false, resultSize);
+			if (operand.shiftValue)
+				res = il.RotateRight(resultSize, res,
+						il.Const(1, operand.shiftValue));
+			return res;
+		default:
+			break;
+	}
+
+	// everything else falls through to maybe be left shifted
+	switch (operand.shiftType)
+	{
+		case ShiftType_LSL:
 			res = ExtractRegister(il, operand, regNum, REGSZ(operand), false, resultSize);
 			break;
-		case SHIFT_SXTB:
+		case ShiftType_SXTB:
 			res = ExtractRegister(il, operand, regNum, 1, true, resultSize);
 			break;
-		case SHIFT_SXTH:
+		case ShiftType_SXTH:
 			res = ExtractRegister(il, operand, regNum, 2, true, resultSize);
 			break;
-		case SHIFT_SXTW:
+		case ShiftType_SXTW:
 			res = ExtractRegister(il, operand, regNum, 4, true, resultSize);
 			break;
-		case SHIFT_SXTX:
+		case ShiftType_SXTX:
 			res = ExtractRegister(il, operand, regNum, 8, true, resultSize);
 			break;
-		case SHIFT_UXTB:
+		case ShiftType_UXTB:
 			res = ExtractRegister(il, operand, regNum, 1, false, resultSize);
 			break;
-		case SHIFT_UXTH:
+		case ShiftType_UXTH:
 			res = ExtractRegister(il, operand, regNum, 2, false, resultSize);
 			break;
-		case SHIFT_UXTW:
+		case ShiftType_UXTW:
 			res = ExtractRegister(il, operand, regNum, 4, false, resultSize);
 			break;
-		case SHIFT_UXTX:
+		case ShiftType_UXTX:
 			res = ExtractRegister(il, operand, regNum, 8, false, resultSize);
 			break;
 		default:
@@ -178,7 +201,7 @@ static size_t ReadILOperand(LowLevelILFunction& il, InstructionOperand& operand,
 	{
 	case IMM32:
 	case IMM64:
-		if (operand.shiftType != SHIFT_NONE && operand.shiftValue)
+		if (operand.shiftType != ShiftType_NONE && operand.shiftValue)
 			return il.Const(resultSize, operand.immediate << operand.shiftValue);
 		else
 			return il.Const(resultSize, operand.immediate);
@@ -672,20 +695,35 @@ static void ConditionalJump(Architecture* arch, LowLevelILFunction& il, size_t c
 enum Arm64Intrinsic operation_to_intrinsic(int operation)
 {
 	switch(operation) {
+		case ARM64_AUTDA: return ARM64_INTRIN_AUTDA;
+		case ARM64_AUTDB: return ARM64_INTRIN_AUTDB;
+		case ARM64_AUTIA: return ARM64_INTRIN_AUTIA;
+		case ARM64_AUTIB: return ARM64_INTRIN_AUTIB;
+		case ARM64_AUTIB1716: return ARM64_INTRIN_AUTIB1716;
+		case ARM64_AUTIBSP: return ARM64_INTRIN_AUTIBSP;
+		case ARM64_AUTIBZ: return ARM64_INTRIN_AUTIBZ;
+		case ARM64_AUTDZA: return ARM64_INTRIN_AUTDZA;
+		case ARM64_AUTDZB: return ARM64_INTRIN_AUTDZB;
+		case ARM64_AUTIZA: return ARM64_INTRIN_AUTIZA;
+		case ARM64_AUTIZB: return ARM64_INTRIN_AUTIZB;
 		case ARM64_PACDA: return ARM64_INTRIN_PACDA;
 		case ARM64_PACDB: return ARM64_INTRIN_PACDB;
 		case ARM64_PACDZA: return ARM64_INTRIN_PACDZA;
 		case ARM64_PACDZB: return ARM64_INTRIN_PACDZB;
-		case ARM64_PACIA1716: return ARM64_INTRIN_PACIA1716;
+		case ARM64_PACGA: return ARM64_INTRIN_PACGA;
 		case ARM64_PACIA: return ARM64_INTRIN_PACIA;
+		case ARM64_PACIA1716: return ARM64_INTRIN_PACIA1716;
 		case ARM64_PACIASP: return ARM64_INTRIN_PACIASP;
 		case ARM64_PACIAZ: return ARM64_INTRIN_PACIAZ;
-		case ARM64_PACIB1716: return ARM64_INTRIN_PACIB1716;
 		case ARM64_PACIB: return ARM64_INTRIN_PACIB;
+		case ARM64_PACIB1716: return ARM64_INTRIN_PACIB1716;
 		case ARM64_PACIBSP: return ARM64_INTRIN_PACIBSP;
 		case ARM64_PACIBZ: return ARM64_INTRIN_PACIBZ;
 		case ARM64_PACIZA: return ARM64_INTRIN_PACIZA;
 		case ARM64_PACIZB: return ARM64_INTRIN_PACIZB;
+		case ARM64_XPACD: return ARM64_INTRIN_XPACD;
+		case ARM64_XPACI: return ARM64_INTRIN_XPACI;
+		case ARM64_XPACLRI: return ARM64_INTRIN_XPACLRI;
 		default:
 			return ARM64_INTRIN_INVALID;
 	}
@@ -779,6 +817,36 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 	case ARM64_BLRAB:
 	case ARM64_BLRABZ:
 		il.AddInstruction(il.Call(ILREG(operand1)));
+		break;
+	case ARM64_BFC:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+			il.And(REGSZ(operand1),
+				il.Const(REGSZ(operand1), ~(ONES(IMM(operand3)) << IMM(operand2))),
+				ILREG(operand1))));
+		break;
+	case ARM64_BFI:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+			il.Or(REGSZ(operand1),
+				il.And(REGSZ(operand1),
+					il.Const(REGSZ(operand1), ~(ONES(IMM(operand4)) << IMM(operand3))),
+					ILREG(operand1)),
+				il.ShiftLeft(REGSZ(operand1),
+					il.And(REGSZ(operand1),
+						il.Const(REGSZ(operand1), ONES(IMM(operand4))),
+						ILREG(operand2)),
+					il.Const(0, IMM(operand3))))));
+		break;
+	case ARM64_BFXIL:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+			il.Or(REGSZ(operand1),
+				il.And(REGSZ(operand1),
+					ILREG(operand1),
+					il.Const(REGSZ(operand1), ~ONES(IMM(operand4)))),
+				il.LogicalShiftRight(REGSZ(operand1),
+					il.And(REGSZ(operand1),
+						ILREG(operand2),
+						il.Const(REGSZ(operand1), ONES(IMM(operand4)) << IMM(operand3))),
+					il.Const(0, IMM(operand3))))));
 		break;
 	case ARM64_BR:
 	case ARM64_BRAA:
@@ -1077,36 +1145,61 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 		il.AddInstruction(il.Nop());
 		break;
 
+	case ARM64_AUTDA:
+	case ARM64_AUTDB:
+	case ARM64_AUTIA:
+	case ARM64_AUTIB:
 	case ARM64_PACDA:
 	case ARM64_PACDB:
 	case ARM64_PACIA:
 	case ARM64_PACIB:
+		// <Xd> is address, <Xn> is modifier
 		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
 					operation_to_intrinsic(instr.operation),
 					{ILREG(operand2)}));
 		break;
+	case ARM64_PACGA:
+		// <Xd> is address, <Xn>, <Xm> are modifiers, keys
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
+					operation_to_intrinsic(instr.operation),
+					{ILREG(operand2), ILREG(operand3)}));
+		break;
+	case ARM64_AUTIB1716:
 	case ARM64_PACIA1716:
 	case ARM64_PACIB1716:
+		// x17 is address, x16 is modifier
 		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_X17)},
 					operation_to_intrinsic(instr.operation),
 					{il.Register(8, REG_X16)}));
 		break;
+	case ARM64_AUTDZA:
+	case ARM64_AUTDZB:
+	case ARM64_AUTIZA:
+	case ARM64_AUTIZB:
 	case ARM64_PACDZA:
 	case ARM64_PACDZB:
 	case ARM64_PACIZA:
 	case ARM64_PACIZB:
+	case ARM64_XPACI:
+	case ARM64_XPACD:
+		// <Xd> is address, modifier is omitted or 0
 		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
 					operation_to_intrinsic(instr.operation),
 					{}));
 		break;
+	case ARM64_AUTIBZ:
 	case ARM64_PACIAZ:
 	case ARM64_PACIBZ:
+	case ARM64_XPACLRI:
+		// x30 is address, modifier is omitted or 0
 		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_X30)},
 					operation_to_intrinsic(instr.operation),
 					{}));
 		break;
+	case ARM64_AUTIBSP:
 	case ARM64_PACIASP:
 	case ARM64_PACIBSP:
+		// x30 is address, sp is modifier
 		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_X30)},
 					operation_to_intrinsic(instr.operation),
 					{il.Register(8, REG_SP)}));
@@ -1131,7 +1224,7 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 						ILREG(operand2),
 						ReadILOperand(il, operand3, REGSZ(operand1)), IL_FLAGWRITE_ALL)));
 		break;
-	case ARM64_PSBCSYNC:
+	case ARM64_PSB:
 		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_PSBCSYNC, {}));
 		break;
 	case ARM64_RET:
@@ -1188,10 +1281,7 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 		break;
 	case ARM64_STR:
 	case ARM64_STUR:
-		if (instr.operands[0].reg[0] >= REG_B0 && instr.operands[0].reg[0] <= REG_Q31)
-			il.AddInstruction(il.Unimplemented());
-		else
-			LoadStoreOperand(il, false, instr.operands[0], instr.operands[1]);
+		LoadStoreOperand(il, false, instr.operands[0], instr.operands[1]);
 		break;
 	case ARM64_STRB:
 	case ARM64_STURB:
@@ -1346,7 +1436,7 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 			if ((IMM(operand1) & ~0b110) == 0b100000)
 				il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_BTI, {}));
 			else
-				LogWarn("unknown hint operand: %llx\n", IMM(operand1));
+				LogWarn("unknown hint operand: 0x%" PRIx64 "\n", IMM(operand1));
 			break;
 		}
 
