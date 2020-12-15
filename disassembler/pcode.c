@@ -172,6 +172,7 @@ enum SystemOp SysOp(uint32_t op1, uint32_t CRn, uint32_t CRm, uint32_t op2)
 		case 0b10001111000000: return Sys_AT;   // S1E2R
 		case 0b11001111000000: return Sys_AT;   // S1E3R
 		case 0b00001111000001: return Sys_AT;   // S1E1W
+		case 0b00001111001001: return Sys_AT;   // S1E1WP
 		case 0b10001111000001: return Sys_AT;   // S1E2W
 		case 0b11001111000001: return Sys_AT;   // S1E3W
 		case 0b00001111000010: return Sys_AT;   // S1E0R
@@ -453,7 +454,7 @@ bool ELUsingAArch32(uint8_t x)
 uint64_t FPOne(bool sign, int N)
 {
 	// width should be 16, 32, 64
-	int E, F, exp, frac;
+	int E, F, exp;
 
 	switch(N) {
 		case 16: E=5;
@@ -469,7 +470,7 @@ uint64_t FPOne(bool sign, int N)
 uint64_t FPTwo(bool sign, int N)
 {
 	// width should be 16, 32, 64
-	int E, F, exp, frac;
+	int E, F, exp;
 
 	switch(N) {
 		case 16: E=5;
@@ -485,7 +486,7 @@ uint64_t FPTwo(bool sign, int N)
 uint64_t FPPointFive(bool sign, int N)
 {
 	// width should be 16, 32, 64
-	int E, F, exp, frac;
+	int E, F, exp;
 
 	switch(N) {
 		case 16: E=5;

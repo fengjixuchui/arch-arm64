@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#ifdef _MSC_VER
+#undef REG_NONE // collides with winnt's define
+#endif
+
 #ifdef __cplusplus
 #define restrict __restrict
 #endif
@@ -211,10 +215,13 @@ typedef struct context_ {
 	//uint32_t exception_level; // used by AArch64.CheckSystemAccess()
 	//uint32_t security_state;
 	uint8_t pstate_btype; // used by BTypeCompatible_BTI()
+	uint8_t pstate_el;
+	uint8_t pstate_uao;
 	bool BTypeCompatible;
 	uint8_t BTypeNext;
 	bool halted; // is CPU halted? used by Halted()
 	uint64_t FPCR; // floating point control register
+	bool EDSCR_HDE; // External Debug Status and Control Register, Halting debug enable
 } context;
 
 //-----------------------------------------------------------------------------
@@ -312,7 +319,6 @@ struct InstructionOperand {
 #define MAX_OPERANDS 5
 
 struct Instruction {
-	int status;
 	uint32_t insword;
 	enum ENCODING encoding;
 
@@ -333,7 +339,6 @@ struct Instruction {
 	uint64_t CRn;
 	uint64_t D;
 	uint64_t E;
-	uint64_t EDSCR_HDE;
 	uint64_t H;
 	uint64_t HCR_EL2_E2H, HCR_EL2_NV, HCR_EL2_NV1, HCR_EL2_TGE;
 	uint64_t L;
@@ -343,18 +348,12 @@ struct Instruction {
 	uint64_t O;
 	uint64_t Op0, Op3;
 	uint64_t P;
-	uint64_t PSTATE_EL;
-	uint64_t PSTATE_UAO;
 	uint64_t Pd, Pdm, Pdn, Pg, Pm, Pn, Pt;
 	uint64_t Q, Qa, Qd, Qm, Qn, Qt, Qt2;
 	uint64_t R, Ra, Rd, Rdn, Rm, Rmhi, Rn, Rs, Rt, Rt2;
 	uint64_t S, Sa, Sd, Sm, Sn, St, St2;
 	uint64_t S10;
 	uint64_t SCTLR_EL1_UMA;
-	uint64_t Sys_AT;
-	uint64_t Sys_DC;
-	uint64_t Sys_IC;
-	uint64_t Sys_TLBI;
 	uint64_t T;
 	uint64_t U;
 	uint64_t US;

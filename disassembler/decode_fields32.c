@@ -1,5 +1,4 @@
-/* GENERATED FILE - DO NOT MODIFY - SUBMIT GITHUB ISSUE IF PROBLEM FOUND */
-
+/* GENERATED FILE */
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -11,6 +10,7 @@
 void decode_fields32(enum ENCODING enc, Instruction *dec)
 {
 	uint32_t insword = dec->insword;
+	dec->encoding = enc; /* record current path of decoding */
 	switch(enc) {
 		case ENC_FMADD_H_FLOATDP3:
 		case ENC_FMADD_S_FLOATDP3:
