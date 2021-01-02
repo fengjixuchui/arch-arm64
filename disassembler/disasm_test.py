@@ -5,6 +5,10 @@
 
 import os, sys, struct, ctypes, re
 
+RED = '\x1B[31m'
+GREEN = '\x1B[32m'
+NORMAL = '\x1B[0m'
+
 #------------------------------------------------------------------------------
 # disassemble
 #------------------------------------------------------------------------------
@@ -170,6 +174,10 @@ def excusable_difference(actual, expected):
 	if actual.startswith('msr ssbs') and expected.startswith('msr s0_'): return True
 	if actual.startswith('msr pan') and expected.startswith('msr s0_'): return True
 	if actual.startswith('axflag'): return True
+
+	if actual.startswith('sdot'): return True
+	if actual.startswith('udot'): return True
+
 	return False
 
 #------------------------------------------------------------------------------
@@ -207,8 +215,8 @@ def main():
 				if excusable_difference(actual, expected):
 					continue
 				print('0x%08X' % insnum)
-				print('actual:', actual)
-				print('expected:', expected)
+				print('  actual:', RED, actual, NORMAL)
+				print('expected:', GREEN, expected, NORMAL)
 				print('line %d/%d (%.2f%%)' % (i, len(lines), i/len(lines)*100))
 				sys.exit(-1)
 

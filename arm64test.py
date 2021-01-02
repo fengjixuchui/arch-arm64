@@ -3,6 +3,26 @@
 RET = b'\xc0\x03\x5f\xd6'
 
 test_cases = [
+	(b'\x63\x86\xa3\x9b', 'LLIL_SET_REG.q(x3,LLIL_SUB.q(LLIL_REG.q(x1),LLIL_MULU_DP.q(LLIL_REG.d(w19),LLIL_REG.d(w3))))'), # umsubl  x3, w19, w3, x1
+	(b'\x63\xfe\xa3\x9b', 'LLIL_SET_REG.q(x3,LLIL_SUB.q(LLIL_CONST.q(0x0),LLIL_MULU_DP.q(LLIL_REG.d(w19),LLIL_REG.d(w3))))'), # umnegl  x3, w19, w3
+	(b'\x63\x86\x23\x9b', 'LLIL_SET_REG.q(x3,LLIL_SUB.q(LLIL_REG.q(x1),LLIL_MULS_DP.q(LLIL_REG.d(w19),LLIL_REG.d(w3))))'), # smsubl  x3, w19, w3, x1
+	(b'\x63\xfe\x23\x9b', 'LLIL_SET_REG.q(x3,LLIL_SUB.q(LLIL_CONST.q(0x0),LLIL_MULS_DP.q(LLIL_REG.d(w19),LLIL_REG.d(w3))))'), # smnegl  x3, w19, w3
+	(b'\x63\x06\x23\x9b', 'LLIL_SET_REG.q(x3,LLIL_ADD.q(LLIL_REG.q(x1),LLIL_MULS_DP.q(LLIL_REG.d(w19),LLIL_REG.d(w3))))'), # smaddl  x3, w19, w3, x1
+	(b'\x63\x06\xa3\x9b', 'LLIL_SET_REG.q(x3,LLIL_ADD.q(LLIL_REG.q(x1),LLIL_MULU_DP.q(LLIL_REG.d(w19),LLIL_REG.d(w3))))'), # umaddl  x3, w19, w3, x1
+	(b'\x00\xfc\x14\x9b', 'LLIL_SET_REG.q(x0,LLIL_SUB.q(LLIL_CONST.q(0x0),LLIL_MUL.q(LLIL_REG.q(x0),LLIL_REG.q(x20))))'), # mneg    x0, x0, x20
+	(b'\x20\x00\x02\x9a', 'LLIL_SET_REG.q(x0,LLIL_ADC.q(LLIL_REG.q(x1),LLIL_REG.q(x2),LLIL_FLAG(c)))'), # adc x0, x1, x2
+	(b'\x20\x00\x02\xba', 'LLIL_SET_REG.q(x0,LLIL_ADC.q(LLIL_REG.q(x1),LLIL_REG.q(x2),LLIL_FLAG(c)))'), # adcs x0, x1, x2
+	(b'\x08\x75\x93\x13', 'LLIL_SET_REG.d(w8,LLIL_LSR.q(LLIL_OR.q(LLIL_LSL.q(LLIL_REG.d(w8),LLIL_CONST.b(0x20)),LLIL_REG.d(w19)),LLIL_CONST.b(0x1D)))'), # extr    w8, w8, w19, #0x1d
+	(b'\x20\x28\xc2\x93', 'LLIL_SET_REG.q(x0,LLIL_LSR.128(LLIL_OR.128(LLIL_LSL.128(LLIL_REG.q(x1),LLIL_CONST.b(0x40)),LLIL_REG.q(x2)),LLIL_CONST.b(0xA)))'), # extr x0, x1, x2, #10
+	(b'\xc6\x0c\xc0\xda', 'LLIL_INTRINSIC([x6],_byteswap,LLIL_CALL_PARAM([LLIL_REG.q(x6)]))'), # rev x6, x6
+	(b'\xcb\x10\xc0\xda', 'LLIL_INTRINSIC([x11],_CountLeadingZeros,LLIL_CALL_PARAM([LLIL_REG.q(x6)]))'), # clz     x11, x6
+	(b'\x63\x00\xc0\xda', 'LLIL_INTRINSIC([x3],__rbit,LLIL_CALL_PARAM([LLIL_REG.q(x3)]))'), # rbit    x3, x3
+	# Unknown system register
+	(b'\x21\x00\x1b\xd5', 'LLIL_INTRINSIC([unknown_catchall],_WriteStatusReg,LLIL_CALL_PARAM([LLIL_REG.q(x1)]))'), # msr s3_3_c0_c0_1, x1
+	(b'\x23\x00\x3b\xd5', 'LLIL_INTRINSIC([x3],_ReadStatusReg,LLIL_CALL_PARAM([LLIL_REG.d(unknown_catchall)]))'), # mrs x3, s3_3_c0_c0_1
+	(b'\xe0\x03\x9f\xd6', 'LLIL_INTRINSIC([],_eret,LLIL_CALL_PARAM([])); LLIL_TRAP(0)'), # eret
+	(b'\x00\x10\x2e\x1e', 'LLIL_SET_REG.d(s0,LLIL_FLOAT_CONST.d(1.0))'), # fmov s0, #1.00000000
+	(b'\x01\x10\x20\x1e', 'LLIL_SET_REG.d(s1,LLIL_FLOAT_CONST.d(2.0))'), # fmov s1, #2.00000000
 	(b'\x00\x28\x21\x1e', 'LLIL_SET_REG.d(s0,LLIL_FADD.d(LLIL_REG.d(s0),LLIL_REG.d(s1)))'), # fadd s0, s0, s1
 	(b'\x00\x38\x21\x1e', 'LLIL_SET_REG.d(s0,LLIL_FSUB.d(LLIL_REG.d(s0),LLIL_REG.d(s1)))'), # fsub s0, s0, s1
 	(b'\x00\x08\x21\x1e', 'LLIL_SET_REG.d(s0,LLIL_FMUL.d(LLIL_REG.d(s0),LLIL_REG.d(s1)))'), # fmul s0, s0, s1
@@ -73,7 +93,6 @@ test_cases = [
 	# FMOV_fdup_z_i_ 00100101xx111001110xxxxxxxxxxxxx
 	#b'\xA8\xD7\xF9\x25', '?'), # fmov z8.d, #-29.0
 	#b'\xD0\xD1\xF9\x25', '?'), # fmov z16.d, #-3.75
-	#
 	(b'\x00\xc0\x1e\xd5', 'LLIL_INTRINSIC([vbar_el3],_WriteStatusReg,LLIL_CALL_PARAM([LLIL_REG.q(x0)]))'), # msr vbar_el3, x0
 	(b'\x69\x01\x08\x4a', 'LLIL_SET_REG.d(w9,LLIL_XOR.d(LLIL_REG.d(w11),LLIL_REG.d(w8)))'), # eor w9, w11, w8
 	(b'\x2c\x09\xd5\x4a', 'LLIL_SET_REG.d(w12,LLIL_XOR.d(LLIL_REG.d(w9),LLIL_ROR.d(LLIL_REG.d(w21),LLIL_CONST.b(0x2))))'), # eor w12, w9, w21, ror #0x2
@@ -445,8 +464,8 @@ test_cases = [
 	(b'\x41\x00\x03\xab', 'LLIL_SET_REG.q(x1,LLIL_ADD.q(LLIL_REG.q(x2),LLIL_REG.q(x3)))'), # adds x1,x2,x3 with IL_FLAGWRITE_ALL
 	(b'\x41\x00\x03\x8a', 'LLIL_SET_REG.q(x1,LLIL_AND.q(LLIL_REG.q(x2),LLIL_REG.q(x3)))'), # and x1,x2,x3
 	(b'\x41\x00\x03\xea', 'LLIL_SET_REG.q(x1,LLIL_AND.q(LLIL_REG.q(x2),LLIL_REG.q(x3)))'), # ands x1,x2,x3 with IL_FLAGWRITE_ALL
-	(b'\x41\x00\x03\xda', 'LLIL_SET_REG.q(x1,LLIL_SBB.q(LLIL_REG.q(x2),LLIL_REG.q(x3),LLIL_FLAG(c)))'), # sbc x1,x2,x3
-	(b'\x41\x00\x03\xfa', 'LLIL_SET_REG.q(x1,LLIL_SBB.q(LLIL_REG.q(x2),LLIL_REG.q(x3),LLIL_FLAG(c)))'), # sbcs x1,x2,x3 with IL_FLAGWRITE_ALL
+	(b'\x41\x00\x03\xda', 'LLIL_SET_REG.q(x1,LLIL_SBB.q(LLIL_REG.q(x2),LLIL_REG.q(x3),LLIL_NOT(LLIL_FLAG(c))))'), # sbc x1,x2,x3
+	(b'\x41\x00\x03\xfa', 'LLIL_SET_REG.q(x1,LLIL_SBB.q(LLIL_REG.q(x2),LLIL_REG.q(x3),LLIL_NOT(LLIL_FLAG(c))))'), # sbcs x1,x2,x3 with IL_FLAGWRITE_ALL
 	(b'\x01\x00\x00\xd4', 'LLIL_SET_REG.w(syscall_imm,LLIL_CONST.w(0x0)); LLIL_SYSCALL()'), # svc #0; ret; ZwAccessCheck() on win-arm64
 	(b'\x21\x00\x00\xd4', 'LLIL_SET_REG.w(syscall_imm,LLIL_CONST.w(0x1)); LLIL_SYSCALL()'), # svc #1; ret; ZwWorkerFactoryWorkerReady() on win-arm64
 	(b'\x41\x00\x00\xd4', 'LLIL_SET_REG.w(syscall_imm,LLIL_CONST.w(0x2)); LLIL_SYSCALL()'), # svc #2; ret; ZwAcceptConnectPort() on win-arm64

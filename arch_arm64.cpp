@@ -383,15 +383,17 @@ protected:
 			result.AddBranch(TrueBranch, instr.operands[1].immediate);
 			result.AddBranch(FalseBranch, addr + 4);
 			break;
-		case ARM64_ERET:
-		case ARM64_DRPS:
 		case ARM64_BR:
 		case ARM64_BRAA:
 		case ARM64_BRAAZ:
 		case ARM64_BRAB:
 		case ARM64_BRABZ:
+		case ARM64_DRPS:
 			result.AddBranch(UnresolvedBranch);
 			break;
+		case ARM64_ERET:
+		case ARM64_ERETAA:
+		case ARM64_ERETAB:
 		case ARM64_RET:
 		case ARM64_RETAA:
 		case ARM64_RETAB:
@@ -399,8 +401,7 @@ protected:
 			break;
 
 		case ARM64_SVC:
-			if (instr.operands[0].immediate == 0)
-				result.AddBranch(SystemCall);
+			result.AddBranch(SystemCall);
 			break;
 
 		default:
@@ -409,43 +410,43 @@ protected:
 	}
 
 
-	uint32_t tokenize_shift(const InstructionOperand* __restrict instructionOperand, vector<InstructionTextToken>& result)
+	uint32_t tokenize_shift(const InstructionOperand* __restrict operand, vector<InstructionTextToken>& result)
 	{
-		char operand[64] = {0};
-		if (instructionOperand->shiftType != ShiftType_NONE)
+		if (operand->shiftType != ShiftType_NONE)
 		{
-			const char* shiftStr = get_shift(instructionOperand->shiftType);
+			const char* shiftStr = get_shift(operand->shiftType);
 			if (shiftStr == NULL)
 				return FAILED_TO_DISASSEMBLE_OPERAND;
 
 			result.emplace_back(TextToken, ", ");
 			result.emplace_back(TextToken, shiftStr);
-			if (instructionOperand->shiftValueUsed != 0)
+			if (operand->shiftValueUsed != 0)
 			{
-				snprintf(operand, sizeof(operand), "%#x", (uint32_t)instructionOperand->shiftValue);
+				char buf[64] = {0};
+				snprintf(buf, sizeof(buf), "%#x", (uint32_t)operand->shiftValue);
 				result.emplace_back(TextToken, " #");
-				result.emplace_back(IntegerToken, operand, instructionOperand->shiftValue);
+				result.emplace_back(IntegerToken, buf, operand->shiftValue);
 			}
 		}
 		return DISASM_SUCCESS;
 	}
 
 
-	uint32_t tokenize_shifted_immediate(const InstructionOperand* __restrict instructionOperand,	vector<InstructionTextToken>& result)
+	uint32_t tokenize_shifted_immediate(const InstructionOperand* __restrict operand,	vector<InstructionTextToken>& result)
 	{
-		char operand[64] = {0};
+		char buf[64] = {0};
 		const char* sign = "";
-		if (instructionOperand == NULL)
+		if (operand == NULL)
 			return FAILED_TO_DISASSEMBLE_OPERAND;
 
-		uint64_t imm = instructionOperand->immediate;
-		if (instructionOperand->signedImm == 1 && ((int64_t)imm) < 0)
+		uint64_t imm = operand->immediate;
+		if (operand->signedImm == 1 && ((int64_t)imm) < 0)
 		{
 			sign = "-";
 			imm = -(int64_t)imm;
 		}
 
-		switch (instructionOperand->operandClass)
+		switch (operand->operandClass)
 		{
 		case FIMM32:
 			{
@@ -454,101 +455,101 @@ protected:
 				uint32_t intValue;
 				float floatValue;
 			} f;
-			f.intValue = (uint32_t)instructionOperand->immediate;
-			snprintf(operand, sizeof(operand), "%.08f", f.floatValue);
+			f.intValue = (uint32_t)operand->immediate;
+			snprintf(buf, sizeof(buf), "%.08f", f.floatValue);
 			result.emplace_back(TextToken, "#");
-			result.emplace_back(FloatingPointToken, operand);
+			result.emplace_back(FloatingPointToken, buf);
 			break;
 			}
 		case IMM32:
-			snprintf(operand, sizeof(operand), "%s%#x", sign, (uint32_t)imm);
+			snprintf(buf, sizeof(buf), "%s%#x", sign, (uint32_t)imm);
 			result.emplace_back(TextToken, "#");
-			result.emplace_back(IntegerToken, operand, instructionOperand->immediate);
+			result.emplace_back(IntegerToken, buf, operand->immediate);
 			break;
 		case IMM64:
-			snprintf(operand, sizeof(operand), "%s%#" PRIx64 , sign, imm);
+			snprintf(buf, sizeof(buf), "%s%#" PRIx64 , sign, imm);
 			result.emplace_back(TextToken, "#");
-			result.emplace_back(IntegerToken, operand, instructionOperand->immediate);
+			result.emplace_back(IntegerToken, buf, operand->immediate);
 			break;
 		case LABEL:
-			snprintf(operand, sizeof(operand), "%#" PRIx64 , instructionOperand->immediate);
-			result.emplace_back(PossibleAddressToken, operand, instructionOperand->immediate);
+			snprintf(buf, sizeof(buf), "%#" PRIx64 , operand->immediate);
+			result.emplace_back(PossibleAddressToken, buf, operand->immediate);
 			break;
 		default:
 			return FAILED_TO_DISASSEMBLE_OPERAND;
 		}
 
-		tokenize_shift(instructionOperand, result);
+		tokenize_shift(operand, result);
 		return DISASM_SUCCESS;
 	}
 
 
 	uint32_t tokenize_shifted_register(
-		const InstructionOperand* restrict instructionOperand,
+		const InstructionOperand* restrict operand,
 		uint32_t registerNumber,
 		vector<InstructionTextToken>& result)
 	{
-		const char *reg = get_register_name(instructionOperand->reg[registerNumber]);
+		const char *reg = get_register_name(operand->reg[registerNumber]);
 		if(EMPTY(reg)) return FAILED_TO_DISASSEMBLE_REGISTER;
 
 		result.emplace_back(RegisterToken, reg);
-		tokenize_shift(instructionOperand, result);
+		tokenize_shift(operand, result);
 		return DISASM_SUCCESS;
 	}
 
 	uint32_t tokenize_register(
-			const InstructionOperand* restrict instructionOperand,
+			const InstructionOperand* restrict operand,
 			uint32_t registerNumber,
 			vector<InstructionTextToken>& result)
 	{
 		char buf[64] = {0};
 
 		/* case: system registers */
-		if (instructionOperand->operandClass == SYS_REG)
+		if (operand->operandClass == SYS_REG)
 		{
 			snprintf(buf, sizeof(buf), "%s",
-			  get_system_register_name((SystemReg)instructionOperand->reg[registerNumber]));
+				get_system_register_name((SystemReg)operand->sysreg));
 			result.emplace_back(RegisterToken, buf);
 			return DISASM_SUCCESS;
 		}
 
-		if (instructionOperand->operandClass != REG && instructionOperand->operandClass != MULTI_REG)
+		if (operand->operandClass != REG && operand->operandClass != MULTI_REG)
 			return OPERAND_IS_NOT_REGISTER;
 
 		/* case: shifted registers */
-		if (instructionOperand->shiftType != ShiftType_NONE)
+		if (operand->shiftType != ShiftType_NONE)
 		{
-			return tokenize_shifted_register(instructionOperand, registerNumber, result);
+			return tokenize_shifted_register(operand, registerNumber, result);
 		}
 
-		const char *reg = get_register_name(instructionOperand->reg[registerNumber]);
+		const char *reg = get_register_name(operand->reg[registerNumber]);
 		if(EMPTY(reg)) return FAILED_TO_DISASSEMBLE_REGISTER;
 
 		/* case: predicate registers */
-		if(instructionOperand->pred_qual && instructionOperand->reg[registerNumber] >= REG_P0 && instructionOperand->reg[registerNumber] <= REG_P31)
+		if(operand->pred_qual && operand->reg[registerNumber] >= REG_P0 && operand->reg[registerNumber] <= REG_P31)
 		{
 			result.emplace_back(RegisterToken, reg);
 			result.emplace_back(TextToken, "/");
-			result.emplace_back(TextToken, string(1, instructionOperand->pred_qual));
+			result.emplace_back(TextToken, string(1, operand->pred_qual));
 			return DISASM_SUCCESS;
 		}
 
 		/* case other regs */
 		result.emplace_back(RegisterToken, reg);
-		const char *arrspec = get_register_arrspec(instructionOperand->reg[registerNumber]);
+		const char *arrspec = get_register_arrspec(operand->reg[registerNumber], operand);
 		if(arrspec)
 			result.emplace_back(TextToken, arrspec);
 
-		if (instructionOperand->scale) {
-			sprintf(buf, "%u", 0x7fffffff & instructionOperand->scale);
+		if (operand->scale) {
+			sprintf(buf, "%u", 0x7fffffff & operand->scale);
 			result.emplace_back(TextToken, "[");
 			result.emplace_back(IntegerToken, buf);
 			result.emplace_back(TextToken, "]");
 		}
 
 		/* only use index if this is isolated REG (not, for example, MULTIREG */
-		if(instructionOperand->operandClass == REG && instructionOperand->indexUsed) {
-			sprintf(buf, "%u", instructionOperand->index);
+		if(operand->operandClass == REG && operand->laneUsed) {
+			sprintf(buf, "%u", operand->lane);
 			result.emplace_back(TextToken, "[");
 			result.emplace_back(IntegerToken, buf);
 			result.emplace_back(TextToken, "]");
@@ -559,19 +560,19 @@ protected:
 
 
 	uint32_t tokenize_memory_operand(
-		const InstructionOperand* restrict instructionOperand,
+		const InstructionOperand* restrict operand,
 		vector<InstructionTextToken>& result)
 	{
 		char immBuff[32] = {0};
 		char paramBuff[32] = {0};
 		const char *reg0, *reg1;
 
-		reg0 = get_register_name(instructionOperand->reg[0]);
+		reg0 = get_register_name(operand->reg[0]);
 		if(EMPTY(reg0)) return FAILED_TO_DISASSEMBLE_REGISTER;
 
 		const char* sign = "";
-		int64_t imm = instructionOperand->immediate;
-		if (instructionOperand->signedImm && (int64_t)imm < 0)
+		int64_t imm = operand->immediate;
+		if (operand->signedImm && (int64_t)imm < 0)
 		{
 			sign = "-";
 			imm = -imm;
@@ -580,52 +581,52 @@ protected:
 		const char *endToken = "]";
 		result.emplace_back(BeginMemoryOperandToken, startToken);
 		result.emplace_back(RegisterToken, reg0);
-		result.emplace_back(TextToken, get_register_arrspec(instructionOperand->reg[0]));
+		result.emplace_back(TextToken, get_register_arrspec(operand->reg[0], operand));
 
-		switch (instructionOperand->operandClass)
+		switch (operand->operandClass)
 		{
 		case MEM_REG: break;
 		case MEM_PRE_IDX:
 			endToken = "]!";
 			snprintf(immBuff, sizeof(immBuff), "%s%#" PRIx64, sign, (uint64_t)imm);
 			result.emplace_back(TextToken, ", #");
-			result.emplace_back(IntegerToken, immBuff, instructionOperand->immediate);
+			result.emplace_back(IntegerToken, immBuff, operand->immediate);
 			break;
 		case MEM_POST_IDX: // [<reg>], <reg|imm>
 			endToken = NULL;
-			if(instructionOperand->reg[1] == REG_NONE)
+			if(operand->reg[1] == REG_NONE)
 			{
 				snprintf(paramBuff, sizeof(paramBuff), "%s%#" PRIx64, sign, (uint64_t)imm);
 				result.emplace_back(EndMemoryOperandToken, "], #");
-				result.emplace_back(IntegerToken, paramBuff, instructionOperand->immediate);
+				result.emplace_back(IntegerToken, paramBuff, operand->immediate);
 			}
 			else
 			{
-				reg1 = get_register_name(instructionOperand->reg[1]);
+				reg1 = get_register_name(operand->reg[1]);
 				if(EMPTY(reg1)) return FAILED_TO_DISASSEMBLE_REGISTER;
 				result.emplace_back(EndMemoryOperandToken, "], ");
 				result.emplace_back(RegisterToken, reg1);
-				result.emplace_back(TextToken, get_register_arrspec(instructionOperand->reg[1]));
+				result.emplace_back(TextToken, get_register_arrspec(operand->reg[1], operand));
 			}
 			break;
 		case MEM_OFFSET: // [<reg> optional(imm)]
-			if (instructionOperand->immediate != 0)
+			if (operand->immediate != 0)
 			{
 				snprintf(immBuff, sizeof(immBuff), "%s%#" PRIx64, sign, (uint64_t)imm);
 				result.emplace_back(TextToken, ", #");
-				result.emplace_back(IntegerToken, immBuff, instructionOperand->immediate);
+				result.emplace_back(IntegerToken, immBuff, operand->immediate);
 
-				if(instructionOperand->mul_vl)
+				if(operand->mul_vl)
 					result.emplace_back(TextToken, ", mul vl");
 			}
 			break;
 		case MEM_EXTENDED: // [<reg>, <reg> optional(shift optional(imm))]
 			result.emplace_back(TextToken, ", ");
-			reg1 = get_register_name(instructionOperand->reg[1]);
+			reg1 = get_register_name(operand->reg[1]);
 			if(EMPTY(reg1)) return FAILED_TO_DISASSEMBLE_REGISTER;
 			result.emplace_back(RegisterToken, reg1);
-			result.emplace_back(TextToken, get_register_arrspec(instructionOperand->reg[1]));
-			tokenize_shift(instructionOperand, result);
+			result.emplace_back(TextToken, get_register_arrspec(operand->reg[1], operand));
+			tokenize_shift(operand, result);
 			break;
 		default:
 			return NOT_MEMORY_OPERAND;
@@ -653,21 +654,21 @@ protected:
 		}
 		result.emplace_back(TextToken, "}");
 
-		if(operand->indexUsed)
+		if(operand->laneUsed)
 		{
 			result.emplace_back(TextToken, "[");
-			snprintf(index, sizeof(index), "%d", operand->index);
-			result.emplace_back(IntegerToken, index, operand->index);
+			snprintf(index, sizeof(index), "%d", operand->lane);
+			result.emplace_back(IntegerToken, index, operand->lane);
 			result.emplace_back(TextToken, "]");
 		}
 		return DISASM_SUCCESS;
 	}
 
 
-	uint32_t tokenize_condition(const InstructionOperand* restrict instructionOperand,
+	uint32_t tokenize_condition(const InstructionOperand* restrict operand,
 		vector<InstructionTextToken>& result)
 	{
-		const char* condStr = get_condition((Condition)instructionOperand->reg[0]);
+		const char* condStr = get_condition((Condition)operand->cond);
 		if (condStr == NULL)
 			return FAILED_TO_DISASSEMBLE_OPERAND;
 
@@ -676,12 +677,12 @@ protected:
 	}
 
 
-	uint32_t tokenize_implementation_specific(const InstructionOperand* restrict instructionOperand,
+	uint32_t tokenize_implementation_specific(const InstructionOperand* restrict operand,
 		vector<InstructionTextToken>& result)
 	{
-		char operand[32] = {0};
-		get_implementation_specific(instructionOperand, operand, sizeof(operand));
-		result.emplace_back(RegisterToken, operand);
+		char buf[32] = {0};
+		get_implementation_specific(operand, buf, sizeof(buf));
+		result.emplace_back(RegisterToken, buf);
 		return DISASM_SUCCESS;
 	}
 
@@ -935,6 +936,18 @@ public:
 			return "__xpaci";
 		case ARM64_INTRIN_XPACLRI:
 			return "__xpaclri";
+		case ARM64_INTRIN_ERET:
+			return "_eret";
+		case ARM64_INTRIN_CLZ:
+			return "_CountLeadingZeros";
+		case ARM64_INTRIN_REV:
+			return "_byteswap";
+		case ARM64_INTRIN_RBIT:
+			return "__rbit";
+		case ARM64_INTRIN_AESD:
+			return "__aesd";
+		case ARM64_INTRIN_AESE:
+			return "__aese";
 		default:
 			return "";
 		}
@@ -956,7 +969,9 @@ public:
 			ARM64_INTRIN_PACIBZ, ARM64_INTRIN_PACIZB,
 			ARM64_INTRIN_PRFM, ARM64_INTRIN_PSBCSYNC, ARM64_INTRIN_SEV, ARM64_INTRIN_SEVL, ARM64_INTRIN_WFE,
 			ARM64_INTRIN_WFI, ARM64_INTRIN_YIELD,
-			ARM64_INTRIN_XPACD, ARM64_INTRIN_XPACI, ARM64_INTRIN_XPACLRI
+			ARM64_INTRIN_XPACD, ARM64_INTRIN_XPACI, ARM64_INTRIN_XPACLRI,
+			ARM64_INTRIN_ERET, ARM64_INTRIN_CLZ, ARM64_INTRIN_REV, ARM64_INTRIN_RBIT,
+			ARM64_INTRIN_AESD, ARM64_INTRIN_AESE
 		};
 	}
 
@@ -966,7 +981,7 @@ public:
 		switch (intrinsic)
 		{
 		case ARM64_INTRIN_MRS:
-			return {NameAndType(Type::IntegerType(4, false))};
+			return {NameAndType(Type::IntegerType(8, false))};
 		case ARM64_INTRIN_AUTDA: // reads <Xn|SP>
 		case ARM64_INTRIN_AUTDB: // reads <Xn|SP>
 		case ARM64_INTRIN_AUTIA: // reads <Xn|SP>
@@ -980,12 +995,18 @@ public:
 		case ARM64_INTRIN_PACIB: // reads <Xn>
 		case ARM64_INTRIN_PACIB1716: // reads x16
 		case ARM64_INTRIN_PRFM:
+		case ARM64_INTRIN_CLZ: // reads <Xn>
+		case ARM64_INTRIN_REV: // reads <Xn>
+		case ARM64_INTRIN_RBIT: // reads <Xn>
 			return {NameAndType(Type::IntegerType(8, false))};
 		case ARM64_INTRIN_AUTIBSP: // reads x30, sp
 		case ARM64_INTRIN_PACGA: // reads <Xn>, <Xm|SP>
 		case ARM64_INTRIN_PACIASP: // reads x30, sp
 		case ARM64_INTRIN_PACIBSP: // reads x30, sp
 			return {NameAndType(Type::IntegerType(8, false)), NameAndType(Type::IntegerType(8, false))};
+		case ARM64_INTRIN_AESD:
+		case ARM64_INTRIN_AESE:
+			return {NameAndType(Type::IntegerType(16, false)), NameAndType(Type::IntegerType(16, false))};
 		default:
 			return vector<NameAndType>();
 		}
@@ -997,7 +1018,6 @@ public:
 		switch (intrinsic)
 		{
 		case ARM64_INTRIN_MSR:
-			return {Type::IntegerType(4, false)};
 		case ARM64_INTRIN_AUTDA: // writes <Xd>
 		case ARM64_INTRIN_AUTDB: // writes <Xd>
 		case ARM64_INTRIN_AUTIA: // writes <Xd>
@@ -1028,7 +1048,13 @@ public:
 		case ARM64_INTRIN_XPACD: // writes <Xd>
 		case ARM64_INTRIN_XPACI: // writes <Xd>
 		case ARM64_INTRIN_XPACLRI: // writes x30
+		case ARM64_INTRIN_CLZ: // writes <Xd>
+		case ARM64_INTRIN_REV: // writes <Xd>
+		case ARM64_INTRIN_RBIT: // writes <Xd>
 			return {Type::IntegerType(8, false)};
+		case ARM64_INTRIN_AESD:
+		case ARM64_INTRIN_AESE:
+			return {Type::IntegerType(16, false)};
 		default:
 			return vector<Confidence<Ref<Type>>>();
 		}
@@ -1154,6 +1180,16 @@ public:
 	}
 
 
+	/* flags and their names */
+
+	virtual vector<uint32_t> GetAllFlags() override
+	{
+		return vector<uint32_t>{
+			IL_FLAG_N, IL_FLAG_Z, IL_FLAG_C, IL_FLAG_V
+		};
+	}
+
+
 	virtual string GetFlagName(uint32_t flag) override
 	{
 		char result[32];
@@ -1174,17 +1210,7 @@ public:
 	}
 
 
-	virtual string GetFlagWriteTypeName(uint32_t flags) override
-	{
-		switch (flags)
-		{
-		case IL_FLAGWRITE_ALL:
-			return "*";
-		default:
-			return "";
-		}
-	}
-
+	/* flag roles */
 
 	virtual BNFlagRole GetFlagRole(uint32_t flag, uint32_t) override
 	{
@@ -1204,6 +1230,28 @@ public:
 	}
 
 
+	/* flag write types */
+
+	virtual vector<uint32_t> GetAllFlagWriteTypes() override
+	{
+		return vector<uint32_t>{
+			IL_FLAGWRITE_ALL
+		};
+	}
+
+
+	virtual string GetFlagWriteTypeName(uint32_t flags) override
+	{
+		switch (flags)
+		{
+		case IL_FLAGWRITE_ALL:
+			return "*";
+		default:
+			return "";
+		}
+	}
+
+
 	virtual vector<uint32_t> GetFlagsWrittenByFlagWriteType(uint32_t flags) override
 	{
 		switch (flags)
@@ -1215,6 +1263,8 @@ public:
 		}
 	}
 
+
+	/* connect flags to conditional statements */
 
 	virtual vector<uint32_t> GetFlagsRequiredForFlagCondition(BNLowLevelILFlagCondition cond, uint32_t) override
 	{
@@ -1247,16 +1297,60 @@ public:
 	}
 
 
-	virtual string GetRegisterName(uint32_t reg) override
+	/* override default flag setting expressions */
+
+	virtual size_t GetFlagWriteLowLevelIL(BNLowLevelILOperation op, size_t size, uint32_t flagWriteType,
+		uint32_t flag, BNRegisterOrConstant* operands, size_t operandCount, LowLevelILFunction& il) override
 	{
-		switch (reg) {
-		case REG_NONE:
-			return "";
-		case FAKEREG_SYSCALL_IMM:
-			return "syscall_imm";
+		switch (op)
+		{
+			case LLIL_AND:
+				switch (flag) {
+					case IL_FLAG_V:
+						return il.CompareNotEqual(0,
+								il.Xor(0,
+									il.CompareSignedLessThan(size,
+										il.GetExprForRegisterOrConstantOperation(op, size, operands, operandCount),
+										il.Const(size, 0)),
+									il.Flag(IL_FLAG_V)),
+								il.Const(0, 0));
+					case IL_FLAG_C:
+						return il.Const(0, 0);
+				}
+			case LLIL_SBB:
+				switch (flag) {
+					case IL_FLAG_C:
+						// r u< a || (r == a && flag_c)
+						return il.Or(0,
+								il.CompareUnsignedLessThan(size,
+									il.GetExprForRegisterOrConstantOperation(op, size, operands, operandCount),
+									il.GetExprForRegisterOrConstant(operands[0], size)),
+								il.And(0,
+									il.CompareEqual(size,
+										il.GetExprForRegisterOrConstantOperation(op, size, operands, operandCount),
+										il.GetExprForRegisterOrConstant(operands[0], size)),
+									il.Flag(IL_FLAG_C)));
+
+				}
 		}
 
-		return get_register_name(reg);
+		BNFlagRole role = GetFlagRole(flag, GetSemanticClassForFlagWriteType(flagWriteType));
+		return GetDefaultFlagWriteLowLevelIL(op, size, role, operands, operandCount, il);
+	}
+
+
+	virtual string GetRegisterName(uint32_t reg_) override
+	{
+		if(reg_ > REG_NONE && reg_ < REG_END)
+			return get_register_name((enum Register)reg_);
+
+		if(reg_ > SYSREG_NONE && reg_ < SYSREG_END)
+			return get_system_register_name((enum SystemReg)reg_);
+
+		if(reg_ == FAKEREG_SYSCALL_IMM)
+			return "syscall_imm";
+
+		return "";
 	}
 
 
@@ -1311,6 +1405,135 @@ public:
 			REG_Q8,  REG_Q9,  REG_Q10, REG_Q11, REG_Q12, REG_Q13, REG_Q14, REG_Q15,
 			REG_Q16, REG_Q17, REG_Q18, REG_Q19, REG_Q20, REG_Q21, REG_Q22, REG_Q23,
 			REG_Q24, REG_Q25, REG_Q26, REG_Q27, REG_Q28, REG_Q29, REG_Q30, REG_Q31,
+			// B vectors
+			REG_V0_B0, REG_V0_B1, REG_V0_B2, REG_V0_B3, REG_V0_B4, REG_V0_B5, REG_V0_B6, REG_V0_B7,
+			REG_V0_B8, REG_V0_B9, REG_V0_B10, REG_V0_B11, REG_V0_B12, REG_V0_B13, REG_V0_B14, REG_V0_B15,
+			REG_V1_B0, REG_V1_B1, REG_V1_B2, REG_V1_B3, REG_V1_B4, REG_V1_B5, REG_V1_B6, REG_V1_B7,
+			REG_V1_B8, REG_V1_B9, REG_V1_B10, REG_V1_B11, REG_V1_B12, REG_V1_B13, REG_V1_B14, REG_V1_B15,
+			REG_V2_B0, REG_V2_B1, REG_V2_B2, REG_V2_B3, REG_V2_B4, REG_V2_B5, REG_V2_B6, REG_V2_B7,
+			REG_V2_B8, REG_V2_B9, REG_V2_B10, REG_V2_B11, REG_V2_B12, REG_V2_B13, REG_V2_B14, REG_V2_B15,
+			REG_V3_B0, REG_V3_B1, REG_V3_B2, REG_V3_B3, REG_V3_B4, REG_V3_B5, REG_V3_B6, REG_V3_B7,
+			REG_V3_B8, REG_V3_B9, REG_V3_B10, REG_V3_B11, REG_V3_B12, REG_V3_B13, REG_V3_B14, REG_V3_B15,
+			REG_V4_B0, REG_V4_B1, REG_V4_B2, REG_V4_B3, REG_V4_B4, REG_V4_B5, REG_V4_B6, REG_V4_B7,
+			REG_V4_B8, REG_V4_B9, REG_V4_B10, REG_V4_B11, REG_V4_B12, REG_V4_B13, REG_V4_B14, REG_V4_B15,
+			REG_V5_B0, REG_V5_B1, REG_V5_B2, REG_V5_B3, REG_V5_B4, REG_V5_B5, REG_V5_B6, REG_V5_B7,
+			REG_V5_B8, REG_V5_B9, REG_V5_B10, REG_V5_B11, REG_V5_B12, REG_V5_B13, REG_V5_B14, REG_V5_B15,
+			REG_V6_B0, REG_V6_B1, REG_V6_B2, REG_V6_B3, REG_V6_B4, REG_V6_B5, REG_V6_B6, REG_V6_B7,
+			REG_V6_B8, REG_V6_B9, REG_V6_B10, REG_V6_B11, REG_V6_B12, REG_V6_B13, REG_V6_B14, REG_V6_B15,
+			REG_V7_B0, REG_V7_B1, REG_V7_B2, REG_V7_B3, REG_V7_B4, REG_V7_B5, REG_V7_B6, REG_V7_B7,
+			REG_V7_B8, REG_V7_B9, REG_V7_B10, REG_V7_B11, REG_V7_B12, REG_V7_B13, REG_V7_B14, REG_V7_B15,
+			REG_V8_B0, REG_V8_B1, REG_V8_B2, REG_V8_B3, REG_V8_B4, REG_V8_B5, REG_V8_B6, REG_V8_B7,
+			REG_V8_B8, REG_V8_B9, REG_V8_B10, REG_V8_B11, REG_V8_B12, REG_V8_B13, REG_V8_B14, REG_V8_B15,
+			REG_V9_B0, REG_V9_B1, REG_V9_B2, REG_V9_B3, REG_V9_B4, REG_V9_B5, REG_V9_B6, REG_V9_B7,
+			REG_V9_B8, REG_V9_B9, REG_V9_B10, REG_V9_B11, REG_V9_B12, REG_V9_B13, REG_V9_B14, REG_V9_B15,
+			REG_V10_B0, REG_V10_B1, REG_V10_B2, REG_V10_B3, REG_V10_B4, REG_V10_B5, REG_V10_B6, REG_V10_B7,
+			REG_V10_B8, REG_V10_B9, REG_V10_B10, REG_V10_B11, REG_V10_B12, REG_V10_B13, REG_V10_B14, REG_V10_B15,
+			REG_V11_B0, REG_V11_B1, REG_V11_B2, REG_V11_B3, REG_V11_B4, REG_V11_B5, REG_V11_B6, REG_V11_B7,
+			REG_V11_B8, REG_V11_B9, REG_V11_B10, REG_V11_B11, REG_V11_B12, REG_V11_B13, REG_V11_B14, REG_V11_B15,
+			REG_V12_B0, REG_V12_B1, REG_V12_B2, REG_V12_B3, REG_V12_B4, REG_V12_B5, REG_V12_B6, REG_V12_B7,
+			REG_V12_B8, REG_V12_B9, REG_V12_B10, REG_V12_B11, REG_V12_B12, REG_V12_B13, REG_V12_B14, REG_V12_B15,
+			REG_V13_B0, REG_V13_B1, REG_V13_B2, REG_V13_B3, REG_V13_B4, REG_V13_B5, REG_V13_B6, REG_V13_B7,
+			REG_V13_B8, REG_V13_B9, REG_V13_B10, REG_V13_B11, REG_V13_B12, REG_V13_B13, REG_V13_B14, REG_V13_B15,
+			REG_V14_B0, REG_V14_B1, REG_V14_B2, REG_V14_B3, REG_V14_B4, REG_V14_B5, REG_V14_B6, REG_V14_B7,
+			REG_V14_B8, REG_V14_B9, REG_V14_B10, REG_V14_B11, REG_V14_B12, REG_V14_B13, REG_V14_B14, REG_V14_B15,
+			REG_V15_B0, REG_V15_B1, REG_V15_B2, REG_V15_B3, REG_V15_B4, REG_V15_B5, REG_V15_B6, REG_V15_B7,
+			REG_V15_B8, REG_V15_B9, REG_V15_B10, REG_V15_B11, REG_V15_B12, REG_V15_B13, REG_V15_B14, REG_V15_B15,
+			REG_V16_B0, REG_V16_B1, REG_V16_B2, REG_V16_B3, REG_V16_B4, REG_V16_B5, REG_V16_B6, REG_V16_B7,
+			REG_V16_B8, REG_V16_B9, REG_V16_B10, REG_V16_B11, REG_V16_B12, REG_V16_B13, REG_V16_B14, REG_V16_B15,
+			REG_V17_B0, REG_V17_B1, REG_V17_B2, REG_V17_B3, REG_V17_B4, REG_V17_B5, REG_V17_B6, REG_V17_B7,
+			REG_V17_B8, REG_V17_B9, REG_V17_B10, REG_V17_B11, REG_V17_B12, REG_V17_B13, REG_V17_B14, REG_V17_B15,
+			REG_V18_B0, REG_V18_B1, REG_V18_B2, REG_V18_B3, REG_V18_B4, REG_V18_B5, REG_V18_B6, REG_V18_B7,
+			REG_V18_B8, REG_V18_B9, REG_V18_B10, REG_V18_B11, REG_V18_B12, REG_V18_B13, REG_V18_B14, REG_V18_B15,
+			REG_V19_B0, REG_V19_B1, REG_V19_B2, REG_V19_B3, REG_V19_B4, REG_V19_B5, REG_V19_B6, REG_V19_B7,
+			REG_V19_B8, REG_V19_B9, REG_V19_B10, REG_V19_B11, REG_V19_B12, REG_V19_B13, REG_V19_B14, REG_V19_B15,
+			REG_V20_B0, REG_V20_B1, REG_V20_B2, REG_V20_B3, REG_V20_B4, REG_V20_B5, REG_V20_B6, REG_V20_B7,
+			REG_V20_B8, REG_V20_B9, REG_V20_B10, REG_V20_B11, REG_V20_B12, REG_V20_B13, REG_V20_B14, REG_V20_B15,
+			REG_V21_B0, REG_V21_B1, REG_V21_B2, REG_V21_B3, REG_V21_B4, REG_V21_B5, REG_V21_B6, REG_V21_B7,
+			REG_V21_B8, REG_V21_B9, REG_V21_B10, REG_V21_B11, REG_V21_B12, REG_V21_B13, REG_V21_B14, REG_V21_B15,
+			REG_V22_B0, REG_V22_B1, REG_V22_B2, REG_V22_B3, REG_V22_B4, REG_V22_B5, REG_V22_B6, REG_V22_B7,
+			REG_V22_B8, REG_V22_B9, REG_V22_B10, REG_V22_B11, REG_V22_B12, REG_V22_B13, REG_V22_B14, REG_V22_B15,
+			REG_V23_B0, REG_V23_B1, REG_V23_B2, REG_V23_B3, REG_V23_B4, REG_V23_B5, REG_V23_B6, REG_V23_B7,
+			REG_V23_B8, REG_V23_B9, REG_V23_B10, REG_V23_B11, REG_V23_B12, REG_V23_B13, REG_V23_B14, REG_V23_B15,
+			REG_V24_B0, REG_V24_B1, REG_V24_B2, REG_V24_B3, REG_V24_B4, REG_V24_B5, REG_V24_B6, REG_V24_B7,
+			REG_V24_B8, REG_V24_B9, REG_V24_B10, REG_V24_B11, REG_V24_B12, REG_V24_B13, REG_V24_B14, REG_V24_B15,
+			REG_V25_B0, REG_V25_B1, REG_V25_B2, REG_V25_B3, REG_V25_B4, REG_V25_B5, REG_V25_B6, REG_V25_B7,
+			REG_V25_B8, REG_V25_B9, REG_V25_B10, REG_V25_B11, REG_V25_B12, REG_V25_B13, REG_V25_B14, REG_V25_B15,
+			REG_V26_B0, REG_V26_B1, REG_V26_B2, REG_V26_B3, REG_V26_B4, REG_V26_B5, REG_V26_B6, REG_V26_B7,
+			REG_V26_B8, REG_V26_B9, REG_V26_B10, REG_V26_B11, REG_V26_B12, REG_V26_B13, REG_V26_B14, REG_V26_B15,
+			REG_V27_B0, REG_V27_B1, REG_V27_B2, REG_V27_B3, REG_V27_B4, REG_V27_B5, REG_V27_B6, REG_V27_B7,
+			REG_V27_B8, REG_V27_B9, REG_V27_B10, REG_V27_B11, REG_V27_B12, REG_V27_B13, REG_V27_B14, REG_V27_B15,
+			REG_V28_B0, REG_V28_B1, REG_V28_B2, REG_V28_B3, REG_V28_B4, REG_V28_B5, REG_V28_B6, REG_V28_B7,
+			REG_V28_B8, REG_V28_B9, REG_V28_B10, REG_V28_B11, REG_V28_B12, REG_V28_B13, REG_V28_B14, REG_V28_B15,
+			REG_V29_B0, REG_V29_B1, REG_V29_B2, REG_V29_B3, REG_V29_B4, REG_V29_B5, REG_V29_B6, REG_V29_B7,
+			REG_V29_B8, REG_V29_B9, REG_V29_B10, REG_V29_B11, REG_V29_B12, REG_V29_B13, REG_V29_B14, REG_V29_B15,
+			REG_V30_B0, REG_V30_B1, REG_V30_B2, REG_V30_B3, REG_V30_B4, REG_V30_B5, REG_V30_B6, REG_V30_B7,
+			REG_V30_B8, REG_V30_B9, REG_V30_B10, REG_V30_B11, REG_V30_B12, REG_V30_B13, REG_V30_B14, REG_V30_B15,
+			REG_V31_B0, REG_V31_B1, REG_V31_B2, REG_V31_B3, REG_V31_B4, REG_V31_B5, REG_V31_B6, REG_V31_B7,
+			REG_V31_B8, REG_V31_B9, REG_V31_B10, REG_V31_B11, REG_V31_B12, REG_V31_B13, REG_V31_B14, REG_V31_B15,
+			// H vectors
+			REG_V0_H0, REG_V0_H1, REG_V0_H2, REG_V0_H3, REG_V0_H4, REG_V0_H5, REG_V0_H6, REG_V0_H7,
+			REG_V1_H0, REG_V1_H1, REG_V1_H2, REG_V1_H3, REG_V1_H4, REG_V1_H5, REG_V1_H6, REG_V1_H7,
+			REG_V2_H0, REG_V2_H1, REG_V2_H2, REG_V2_H3, REG_V2_H4, REG_V2_H5, REG_V2_H6, REG_V2_H7,
+			REG_V3_H0, REG_V3_H1, REG_V3_H2, REG_V3_H3, REG_V3_H4, REG_V3_H5, REG_V3_H6, REG_V3_H7,
+			REG_V4_H0, REG_V4_H1, REG_V4_H2, REG_V4_H3, REG_V4_H4, REG_V4_H5, REG_V4_H6, REG_V4_H7,
+			REG_V5_H0, REG_V5_H1, REG_V5_H2, REG_V5_H3, REG_V5_H4, REG_V5_H5, REG_V5_H6, REG_V5_H7,
+			REG_V6_H0, REG_V6_H1, REG_V6_H2, REG_V6_H3, REG_V6_H4, REG_V6_H5, REG_V6_H6, REG_V6_H7,
+			REG_V7_H0, REG_V7_H1, REG_V7_H2, REG_V7_H3, REG_V7_H4, REG_V7_H5, REG_V7_H6, REG_V7_H7,
+			REG_V8_H0, REG_V8_H1, REG_V8_H2, REG_V8_H3, REG_V8_H4, REG_V8_H5, REG_V8_H6, REG_V8_H7,
+			REG_V9_H0, REG_V9_H1, REG_V9_H2, REG_V9_H3, REG_V9_H4, REG_V9_H5, REG_V9_H6, REG_V9_H7,
+			REG_V10_H0, REG_V10_H1, REG_V10_H2, REG_V10_H3, REG_V10_H4, REG_V10_H5, REG_V10_H6, REG_V10_H7,
+			REG_V11_H0, REG_V11_H1, REG_V11_H2, REG_V11_H3, REG_V11_H4, REG_V11_H5, REG_V11_H6, REG_V11_H7,
+			REG_V12_H0, REG_V12_H1, REG_V12_H2, REG_V12_H3, REG_V12_H4, REG_V12_H5, REG_V12_H6, REG_V12_H7,
+			REG_V13_H0, REG_V13_H1, REG_V13_H2, REG_V13_H3, REG_V13_H4, REG_V13_H5, REG_V13_H6, REG_V13_H7,
+			REG_V14_H0, REG_V14_H1, REG_V14_H2, REG_V14_H3, REG_V14_H4, REG_V14_H5, REG_V14_H6, REG_V14_H7,
+			REG_V15_H0, REG_V15_H1, REG_V15_H2, REG_V15_H3, REG_V15_H4, REG_V15_H5, REG_V15_H6, REG_V15_H7,
+			REG_V16_H0, REG_V16_H1, REG_V16_H2, REG_V16_H3, REG_V16_H4, REG_V16_H5, REG_V16_H6, REG_V16_H7,
+			REG_V17_H0, REG_V17_H1, REG_V17_H2, REG_V17_H3, REG_V17_H4, REG_V17_H5, REG_V17_H6, REG_V17_H7,
+			REG_V18_H0, REG_V18_H1, REG_V18_H2, REG_V18_H3, REG_V18_H4, REG_V18_H5, REG_V18_H6, REG_V18_H7,
+			REG_V19_H0, REG_V19_H1, REG_V19_H2, REG_V19_H3, REG_V19_H4, REG_V19_H5, REG_V19_H6, REG_V19_H7,
+			REG_V20_H0, REG_V20_H1, REG_V20_H2, REG_V20_H3, REG_V20_H4, REG_V20_H5, REG_V20_H6, REG_V20_H7,
+			REG_V21_H0, REG_V21_H1, REG_V21_H2, REG_V21_H3, REG_V21_H4, REG_V21_H5, REG_V21_H6, REG_V21_H7,
+			REG_V22_H0, REG_V22_H1, REG_V22_H2, REG_V22_H3, REG_V22_H4, REG_V22_H5, REG_V22_H6, REG_V22_H7,
+			REG_V23_H0, REG_V23_H1, REG_V23_H2, REG_V23_H3, REG_V23_H4, REG_V23_H5, REG_V23_H6, REG_V23_H7,
+			REG_V24_H0, REG_V24_H1, REG_V24_H2, REG_V24_H3, REG_V24_H4, REG_V24_H5, REG_V24_H6, REG_V24_H7,
+			REG_V25_H0, REG_V25_H1, REG_V25_H2, REG_V25_H3, REG_V25_H4, REG_V25_H5, REG_V25_H6, REG_V25_H7,
+			REG_V26_H0, REG_V26_H1, REG_V26_H2, REG_V26_H3, REG_V26_H4, REG_V26_H5, REG_V26_H6, REG_V26_H7,
+			REG_V27_H0, REG_V27_H1, REG_V27_H2, REG_V27_H3, REG_V27_H4, REG_V27_H5, REG_V27_H6, REG_V27_H7,
+			REG_V28_H0, REG_V28_H1, REG_V28_H2, REG_V28_H3, REG_V28_H4, REG_V28_H5, REG_V28_H6, REG_V28_H7,
+			REG_V29_H0, REG_V29_H1, REG_V29_H2, REG_V29_H3, REG_V29_H4, REG_V29_H5, REG_V29_H6, REG_V29_H7,
+			REG_V30_H0, REG_V30_H1, REG_V30_H2, REG_V30_H3, REG_V30_H4, REG_V30_H5, REG_V30_H6, REG_V30_H7,
+			REG_V31_H0, REG_V31_H1, REG_V31_H2, REG_V31_H3, REG_V31_H4, REG_V31_H5, REG_V31_H6, REG_V31_H7,
+			// S vectors
+			REG_V0_S0, REG_V0_S1, REG_V0_S2, REG_V0_S3, REG_V1_S0, REG_V1_S1, REG_V1_S2, REG_V1_S3,
+			REG_V2_S0, REG_V2_S1, REG_V2_S2, REG_V2_S3, REG_V3_S0, REG_V3_S1, REG_V3_S2, REG_V3_S3,
+			REG_V4_S0, REG_V4_S1, REG_V4_S2, REG_V4_S3, REG_V5_S0, REG_V5_S1, REG_V5_S2, REG_V5_S3,
+			REG_V6_S0, REG_V6_S1, REG_V6_S2, REG_V6_S3, REG_V7_S0, REG_V7_S1, REG_V7_S2, REG_V7_S3,
+			REG_V8_S0, REG_V8_S1, REG_V8_S2, REG_V8_S3, REG_V9_S0, REG_V9_S1, REG_V9_S2, REG_V9_S3,
+			REG_V10_S0, REG_V10_S1, REG_V10_S2, REG_V10_S3, REG_V11_S0, REG_V11_S1, REG_V11_S2, REG_V11_S3,
+			REG_V12_S0, REG_V12_S1, REG_V12_S2, REG_V12_S3, REG_V13_S0, REG_V13_S1, REG_V13_S2, REG_V13_S3,
+			REG_V14_S0, REG_V14_S1, REG_V14_S2, REG_V14_S3, REG_V15_S0, REG_V15_S1, REG_V15_S2, REG_V15_S3,
+			REG_V16_S0, REG_V16_S1, REG_V16_S2, REG_V16_S3, REG_V17_S0, REG_V17_S1, REG_V17_S2, REG_V17_S3,
+			REG_V18_S0, REG_V18_S1, REG_V18_S2, REG_V18_S3, REG_V19_S0, REG_V19_S1, REG_V19_S2, REG_V19_S3,
+			REG_V20_S0, REG_V20_S1, REG_V20_S2, REG_V20_S3, REG_V21_S0, REG_V21_S1, REG_V21_S2, REG_V21_S3,
+			REG_V22_S0, REG_V22_S1, REG_V22_S2, REG_V22_S3, REG_V23_S0, REG_V23_S1, REG_V23_S2, REG_V23_S3,
+			REG_V24_S0, REG_V24_S1, REG_V24_S2, REG_V24_S3, REG_V25_S0, REG_V25_S1, REG_V25_S2, REG_V25_S3,
+			REG_V26_S0, REG_V26_S1, REG_V26_S2, REG_V26_S3, REG_V27_S0, REG_V27_S1, REG_V27_S2, REG_V27_S3,
+			REG_V28_S0, REG_V28_S1, REG_V28_S2, REG_V28_S3, REG_V29_S0, REG_V29_S1, REG_V29_S2, REG_V29_S3,
+			REG_V30_S0, REG_V30_S1, REG_V30_S2, REG_V30_S3, REG_V31_S0, REG_V31_S1, REG_V31_S2, REG_V31_S3,
+			// D vectors
+			REG_V0_D0, REG_V0_D1, REG_V1_D0, REG_V1_D1, REG_V2_D0, REG_V2_D1, REG_V3_D0, REG_V3_D1,
+			REG_V4_D0, REG_V4_D1, REG_V5_D0, REG_V5_D1, REG_V6_D0, REG_V6_D1, REG_V7_D0, REG_V7_D1,
+			REG_V8_D0, REG_V8_D1, REG_V9_D0, REG_V9_D1, REG_V10_D0, REG_V10_D1, REG_V11_D0, REG_V11_D1,
+			REG_V12_D0, REG_V12_D1, REG_V13_D0, REG_V13_D1, REG_V14_D0, REG_V14_D1, REG_V15_D0, REG_V15_D1,
+			REG_V16_D0, REG_V16_D1, REG_V17_D0, REG_V17_D1, REG_V18_D0, REG_V18_D1, REG_V19_D0, REG_V19_D1,
+			REG_V20_D0, REG_V20_D1, REG_V21_D0, REG_V21_D1, REG_V22_D0, REG_V22_D1, REG_V23_D0, REG_V23_D1,
+			REG_V24_D0, REG_V24_D1, REG_V25_D0, REG_V25_D1, REG_V26_D0, REG_V26_D1, REG_V27_D0, REG_V27_D1,
+			REG_V28_D0, REG_V28_D1, REG_V29_D0, REG_V29_D1, REG_V30_D0, REG_V30_D1, REG_V31_D0, REG_V31_D1,
+			// Q vectors
+			REG_V0_Q0, REG_V1_Q0, REG_V2_Q0, REG_V3_Q0, REG_V4_Q0, REG_V5_Q0, REG_V6_Q0, REG_V7_Q0,
+			REG_V8_Q0, REG_V9_Q0, REG_V10_Q0, REG_V11_Q0, REG_V12_Q0, REG_V13_Q0, REG_V14_Q0, REG_V15_Q0,
+			REG_V16_Q0, REG_V17_Q0, REG_V18_Q0, REG_V19_Q0, REG_V20_Q0, REG_V21_Q0, REG_V22_Q0, REG_V23_Q0,
+			REG_V24_Q0, REG_V25_Q0, REG_V26_Q0, REG_V27_Q0, REG_V28_Q0, REG_V29_Q0, REG_V30_Q0, REG_V31_Q0,
 			/* system registers */
 			REG_OSDTRRX_EL1, REG_DBGBVR0_EL1, REG_DBGBCR0_EL1, REG_DBGWVR0_EL1,
 			REG_DBGWCR0_EL1, REG_DBGBVR1_EL1, REG_DBGBCR1_EL1, REG_DBGWVR1_EL1,
@@ -1468,27 +1691,12 @@ public:
 			REG_AMAIR_EL3, REG_MPAM3_EL3, REG_VBAR_EL3, REG_RMR_EL3, REG_ICC_CTLR_EL3,
 			REG_ICC_SRE_EL3, REG_ICC_IGRPEN1_EL3, REG_TPIDR_EL3, REG_SCXTNUM_EL3,
 			REG_CNTPS_TVAL_EL1, REG_CNTPS_CTL_EL1, REG_CNTPS_CVAL_EL1, REG_PSTATE_SPSEL,
+			SYSREG_UNKNOWN,
 			/* fake registers */
 			FAKEREG_SYSCALL_IMM
 		};
 
 		return r;
-	}
-
-
-	virtual vector<uint32_t> GetAllFlags() override
-	{
-		return vector<uint32_t>{
-			IL_FLAG_N, IL_FLAG_Z, IL_FLAG_C, IL_FLAG_V
-		};
-	}
-
-
-	virtual vector<uint32_t> GetAllFlagWriteTypes() override
-	{
-		return vector<uint32_t>{
-			IL_FLAGWRITE_ALL
-		};
 	}
 
 
@@ -1596,7 +1804,7 @@ public:
 			case REG_V29:
 			case REG_V30:
 			case REG_V31:
-				return RegisterInfo(REG_Q0+(reg-REG_V0), 0, 16);
+				return RegisterInfo(reg, 0, 16);
 			case REG_B0:
 			case REG_B1:
 			case REG_B2:
@@ -1629,7 +1837,7 @@ public:
 			case REG_B29:
 			case REG_B30:
 			case REG_B31:
-				return RegisterInfo(REG_Q0+(reg-REG_B0), 0, 1);
+				return RegisterInfo(REG_V0+(reg-REG_B0), 0, 1);
 			case REG_H0:
 			case REG_H1:
 			case REG_H2:
@@ -1662,7 +1870,7 @@ public:
 			case REG_H29:
 			case REG_H30:
 			case REG_H31:
-				return RegisterInfo(REG_Q0+(reg-REG_H0), 0, 2);
+				return RegisterInfo(REG_V0+(reg-REG_H0), 0, 2);
 			case REG_S0:
 			case REG_S1:
 			case REG_S2:
@@ -1695,7 +1903,7 @@ public:
 			case REG_S29:
 			case REG_S30:
 			case REG_S31:
-				return RegisterInfo(REG_Q0+(reg-REG_S0), 0, 4);
+				return RegisterInfo(REG_V0+(reg-REG_S0), 0, 4);
 			case REG_D0:
 			case REG_D1:
 			case REG_D2:
@@ -1728,7 +1936,7 @@ public:
 			case REG_D29:
 			case REG_D30:
 			case REG_D31:
-				return RegisterInfo(REG_Q0+(reg-REG_D0), 0, 8);
+				return RegisterInfo(REG_V0+(reg-REG_D0), 0, 8);
 			case REG_Q0:
 			case REG_Q1:
 			case REG_Q2:
@@ -1761,14 +1969,47 @@ public:
 			case REG_Q29:
 			case REG_Q30:
 			case REG_Q31:
-				return RegisterInfo(reg, 0, 16);
-
-			case FAKEREG_SYSCALL_IMM:
-				return RegisterInfo(reg, 0, 2);
+				return RegisterInfo(REG_V0+(reg-REG_Q0), 0, 16);
 		}
 
+		if (reg >= REG_V0_B0 && reg <= REG_V31_B15) {
+			uint32_t r = reg - REG_V0_B0;
+			uint32_t v = r / 16;
+			uint32_t idx = r % 16;
+			return RegisterInfo(REG_V0 + v, idx, 1);
+		}
+
+		if (reg >= REG_V0_H0 && reg <= REG_V31_H7) {
+			uint32_t r = reg - REG_V0_H0;
+			uint32_t v = r / 8;
+			uint32_t idx = r % 8;
+			return RegisterInfo(REG_V0 + v, idx * 2, 2);
+		}
+
+		if (reg >= REG_V0_S0 && reg <= REG_V31_S3) {
+			uint32_t r = reg - REG_V0_S0;
+			uint32_t v = r / 4;
+			uint32_t idx = r % 4;
+			return RegisterInfo(REG_V0 + v, idx * 4, 4);
+		}
+
+		if (reg >= REG_V0_D0 && reg <= REG_V31_D1) {
+			uint32_t r = reg - REG_V0_D0;
+			uint32_t v = r / 2;
+			uint32_t idx = r % 2;
+			return RegisterInfo(REG_V0 + v, idx * 8, 8);
+		}
+
+		if (reg >= REG_V0_Q0 && reg <= REG_V31_Q0) {
+			uint32_t r = reg - REG_V0_Q0;
+			return RegisterInfo(REG_V0 + r, 0, 16);
+		}
+
+		if (reg == FAKEREG_SYSCALL_IMM)
+				return RegisterInfo(reg, 0, 2);
+
 		if (reg > SYSREG_NONE && reg < SYSREG_END)
-			return RegisterInfo(reg, 0, 4);
+			return RegisterInfo(reg, 0, 8);
 
 		return RegisterInfo(0, 0, 0);
 	}

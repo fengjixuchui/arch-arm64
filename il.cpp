@@ -1,4 +1,5 @@
 #include <stdarg.h>
+#include <cstring>
 #include <inttypes.h>
 #include "lowlevelilinstruction.h"
 
@@ -120,6 +121,26 @@ static ExprId ExtractRegister(LowLevelILFunction& il, InstructionOperand& operan
 	return res;
 }
 
+static ExprId GetFloat(LowLevelILFunction& il, Instruction& instr, InstructionOperand& operand)
+{
+	ExprId res;
+
+	switch(instr.datasize) {
+		case 16:
+			res = il.FloatConstRaw(2, operand.immediate);
+			break;
+		case 32:
+			res = il.FloatConstSingle(*(float *)&(operand.immediate));
+			break;
+		case 64:
+			res = il.FloatConstDouble(*(double *)&(operand.immediate));
+			break;
+		default:
+			res = il.Unimplemented();
+	}
+
+	return res;
+}
 
 static ExprId GetShiftedRegister(LowLevelILFunction& il, InstructionOperand& operand, size_t regNum, size_t resultSize)
 {
@@ -749,6 +770,15 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 						ReadILOperand(il, operand3, REGSZ(operand1)),
 						SETFLAGS)));
 		break;
+	case ARM64_ADC:
+	case ARM64_ADCS:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.AddCarry(REGSZ(operand1),
+						ILREG(operand2),
+						ReadILOperand(il, operand3, REGSZ(operand1)),
+						il.Flag(IL_FLAG_C),
+						SETFLAGS)));
+		break;
 	case ARM64_AND:
 	case ARM64_ANDS:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
@@ -763,6 +793,15 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 		break;
 	case ARM64_ASR:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1), il.ArithShiftRight(REGSZ(operand2), ILREG(operand2), il.Const(REGSZ(operand2), IMM(operand3)))));
+		break;
+	case ARM64_AESD:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))}, ARM64_INTRIN_AESD, {ILREG(operand1), ILREG(operand2)}));
+		break;
+	case ARM64_AESE:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))}, ARM64_INTRIN_AESE, {ILREG(operand1), ILREG(operand2)}));
+		break;
+	case ARM64_BTI:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_HINT_BTI, {}));
 		break;
 	case ARM64_B:
 		il.AddInstruction(DirectJump(arch, il, IMM(operand1), addrSize));
@@ -862,8 +901,8 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 					il.And(REGSZ(operand2),
 						ILREG(operand2),
 						il.Not(REGSZ(operand2),
-							ReadILOperand(il, operand3, REGSZ(operand2)), SETFLAGS)
-							)));
+							ReadILOperand(il, operand3, REGSZ(operand2))), SETFLAGS)
+							));
 		break;
 	case ARM64_CBNZ:
 		ConditionalJump(arch, il,
@@ -980,6 +1019,9 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 			il.SetRegister(REGSZ(operand1), REG(operand1), il.Neg(REGSZ(operand1), ILREG(operand2))),
 			il.SetRegister(REGSZ(operand1), REG(operand1), ILREG(operand2)));
 		break;
+	case ARM64_CLZ:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))}, ARM64_INTRIN_CLZ, {ILREG(operand2)}));
+		break;
 	case ARM64_DMB:
 		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_DMB, {}));
 		break;
@@ -1000,6 +1042,14 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 		break;
 	case ARM64_ESB:
 		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_ESB, {}));
+		break;
+	case ARM64_EXTR:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.LogicalShiftRight(REGSZ(operand1) * 2,
+						il.Or(REGSZ(operand1) * 2,
+							il.ShiftLeft(REGSZ(operand1) * 2, ILREG(operand2), il.Const(1, REGSZ(operand1) * 8)),
+							ILREG(operand3)),
+						il.Const(1, IMM(operand4)))));
 		break;
 	case ARM64_FADD:
 		switch(instr.encoding) {
@@ -1062,10 +1112,22 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 				il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.FloatToInt(REGSZ(operand1), ILREG(instr.operands[1]))));
 				break;
+			case ENC_FMOV_H_FLOATIMM:
+			case ENC_FMOV_S_FLOATIMM:
+			case ENC_FMOV_D_FLOATIMM:
+				il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					GetFloat(il, instr, operand2)));
+				break;
 			default:
 				il.AddInstruction(il.Unimplemented());
 		}
 		break;
+	case ARM64_ERET:
+	case ARM64_ERETAA:
+	case ARM64_ERETAB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_ERET, {}));
+		il.AddInstruction(il.Trap(0));
+		return false;
 	case ARM64_ISB:
 		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_ISB, {}));
 		break;
@@ -1167,31 +1229,59 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 					il.Add(REGSZ(operand1), ILREG(operand4), il.Mult(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
 		break;
 	case ARM64_MRS:
-		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
-					ARM64_INTRIN_MRS,
-					{ILREG(operand2)}));
-		break;
+		{
+			ExprId reg = ILREG(operand2);
+			const char *name = get_system_register_name((SystemReg)operand2.reg[0]);
+
+			if (strlen(name) == 0) {
+				LogWarn("Unknown system register @ 0x%" PRIx64 ": S%d_%d_c%d_c%d_%d, using catch-all system register instead\n",
+						addr, operand2.reg[0], operand2.reg[1], operand2.reg[2], operand2.reg[3], operand2.reg[4]);
+				reg = il.Register(4, SYSREG_UNKNOWN);
+			}
+
+			il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
+						ARM64_INTRIN_MRS,
+						{reg}));
+			break;
+		}
 	case ARM64_MSUB:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.Sub(REGSZ(operand1), ILREG(operand4), il.Mult(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
 		break;
+	case ARM64_MNEG:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.Sub(REGSZ(operand1),
+						il.Const(8, 0),
+						il.Mult(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
+		break;
 	case ARM64_MSR:
-		switch (operand2.operandClass) {
-		case IMM32:
-			il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
-						ARM64_INTRIN_MSR,
-						{il.Const(4, IMM(operand2))}));
-			break;
-		case REG:
-			il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))},
-						ARM64_INTRIN_MSR,
-						{ILREG(operand2)}));
-			break;
-		default:
-			LogError("unknown MSR operand class: %x\n", operand2.operandClass);
+		{
+			uint32_t dst = REG(operand1);
+			const char *name = get_system_register_name((SystemReg)dst);
+
+			if (strlen(name) == 0) {
+				LogWarn("Unknown system register @ 0x%" PRIx64 ": S%d_%d_c%d_c%d_%d, using catch-all system register instead\n",
+						addr, operand1.reg[0], operand1.reg[1], operand1.reg[2], operand1.reg[3], operand1.reg[4]);
+				dst = SYSREG_UNKNOWN;
+			}
+
+			switch (operand2.operandClass) {
+				case IMM32:
+					il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(dst)},
+								ARM64_INTRIN_MSR,
+								{il.Const(4, IMM(operand2))}));
+					break;
+				case REG:
+					il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(dst)},
+								ARM64_INTRIN_MSR,
+								{ILREG(operand2)}));
+					break;
+				default:
+					LogError("unknown MSR operand class: %x\n", operand2.operandClass);
+					break;
+			}
 			break;
 		}
-		break;
 	case ARM64_NEG:
 	case ARM64_NEGS:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
@@ -1289,6 +1379,13 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 	case ARM64_RETAB:
 		il.AddInstruction(il.Return(il.Register(8, REG_X30)));
 		break;
+	case ARM64_REV:
+		// if LLIL_BSWAP ever gets added, replace
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))}, ARM64_INTRIN_REV, {ILREG(operand2)}));
+		break;
+	case ARM64_RBIT:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG(operand1))}, ARM64_INTRIN_RBIT, {ILREG(operand2)}));
+		break;
 	case ARM64_ROR:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.RotateRight(REGSZ(operand2),
@@ -1301,7 +1398,7 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 					il.SubBorrow(REGSZ(operand1),
 						ILREG(operand2),
 						ReadILOperand(il, operand3, REGSZ(operand1)),
-						il.Flag(IL_FLAG_C),
+						il.Not(0, il.Flag(IL_FLAG_C)),
 						SETFLAGS)));
 		break;
 	case ARM64_SBFIZ:
@@ -1393,13 +1490,49 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 						ILREG(operand1),
 						ReadILOperand(il, operand2, REGSZ(operand1)), SETFLAGS));
 		break;
+	case ARM64_UMADDL:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.Add(REGSZ(operand1),
+						ILREG(operand4),
+						il.MultDoublePrecUnsigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
+		break;
 	case ARM64_UMULL:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.MultDoublePrecUnsigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3))));
 		break;
+	case ARM64_UMSUBL:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.Sub(REGSZ(operand1),
+						ILREG(operand4),
+						il.MultDoublePrecUnsigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
+		break;
+	case ARM64_UMNEGL:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.Sub(REGSZ(operand1),
+						il.Const(8, 0),
+						il.MultDoublePrecUnsigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
+		break;
+	case ARM64_SMADDL:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.Add(REGSZ(operand1),
+						ILREG(operand4),
+						il.MultDoublePrecSigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
+		break;
 	case ARM64_SMULL:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
 					il.MultDoublePrecSigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3))));
+		break;
+	case ARM64_SMSUBL:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.Sub(REGSZ(operand1),
+						ILREG(operand4),
+						il.MultDoublePrecSigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
+		break;
+	case ARM64_SMNEGL:
+		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
+					il.Sub(REGSZ(operand1),
+						il.Const(8, 0),
+						il.MultDoublePrecSigned(REGSZ(operand1), ILREG(operand2), ILREG(operand3)))));
 		break;
 	case ARM64_UMULH:
 		il.AddInstruction(il.SetRegister(REGSZ(operand1), REG(operand1),
