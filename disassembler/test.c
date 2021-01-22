@@ -15,6 +15,28 @@
 
 int verbose = 1;
 
+char *arrspec_to_str(enum ArrangementSpec as)
+{
+	switch(as) {
+		case ARRSPEC_NONE: return "NONE";
+		case ARRSPEC_FULL: return "FULL";
+		case ARRSPEC_2DOUBLES: return "2DOUBLES";
+		case ARRSPEC_4SINGLES: return "4SINGLES";
+		case ARRSPEC_8HALVES: return "8HALVES";
+		case ARRSPEC_16BYTES: return "16BYTES";
+		case ARRSPEC_1DOUBLE: return "1DOUBLE";
+		case ARRSPEC_2SINGLES: return "2SINGLES";
+		case ARRSPEC_4HALVES: return "4HALVES";
+		case ARRSPEC_8BYTES: return "8BYTES";
+		case ARRSPEC_1SINGLE: return "1SINGLE";
+		case ARRSPEC_2HALVES: return "2HALVES";
+		case ARRSPEC_4BYTES: return "4BYTES";
+		case ARRSPEC_1HALF: return "1HALF";
+		case ARRSPEC_1BYTE: return "1BYTE";
+		default: return "ERROR";
+	}
+}
+
 char *oper_class_to_str(enum OperandClass c)
 {
 	switch(c) {
@@ -24,7 +46,7 @@ char *oper_class_to_str(enum OperandClass c)
 		case FIMM32: return "FIMM32";
 		case STR_IMM: return "STR_IMM";
 		case REG: return "REG";
-		case MULTI_REG: return "MULTIREG";
+		case MULTI_REG: return "MULTI_REG";
 		case SYS_REG: return "SYS_REG";
 		case MEM_REG: return "MEM_REG";
 		case MEM_PRE_IDX: return "MEM_PRE_IDX";
@@ -88,9 +110,13 @@ int disassemble(uint64_t address, uint32_t insword, char *result)
 				case CONDITION:
 					printf("\t\t%d %s\n", operand.cond, cond_to_str(operand.cond));
 					break;
+				case MULTI_REG:
+					printf("\t\t.lane: %d\n", operand.lane);
+					printf("\t\t.laneUsed: %d\n", operand.laneUsed);
 				default:
 					break;
 			}
+			printf("\t.arrSpec: %d %s\n", operand.arrSpec, arrspec_to_str(operand.arrSpec));
 		}
 	}
 
